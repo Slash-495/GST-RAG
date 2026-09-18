@@ -17,16 +17,25 @@ import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 from contextlib import asynccontextmanager
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
+import uuid
 
 import faiss
 import numpy as np
+import boto3
+from botocore.exceptions import ClientError
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, status, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
 from langchain_core.documents import Document
+from unstructured.documents.elements import (
+    Table as UnstructuredTable,
+    ElementMetadata,
+    Text as UnstructuredText
+)
+from unstructured.cleaners.core import clean_extra_whitespace
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -47,6 +56,11 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
+S3_INVOICE_BUCKET = os.getenv("S3_INVOICE_BUCKET", "gst-rag-invoices-slash-495")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -189,6 +203,50 @@ class ChatResponse(BaseModel):
     citations: List[Citation]
     top_chunks: List[TopChunk]
     rerank_engine: str
+
+
+class LineItem(BaseModel):
+    item_description: Optional[str] = None
+    hsn_sac: Optional[str] = None
+    quantity: Optional[float] = None
+    unit_price: Optional[float] = None
+    taxable_amount: Optional[float] = None
+    cgst_rate: Optional[str] = None
+    cgst_amount: Optional[float] = None
+    sgst_rate: Optional[str] = None
+    sgst_amount: Optional[float] = None
+    igst_rate: Optional[str] = None
+    igst_amount: Optional[float] = None
+    total_tax_rate: Optional[str] = None
+    total_amount: Optional[float] = None
+
+
+class ExtractedTable(BaseModel):
+    table_index: int
+    rows_count: int
+    columns_count: int
+    headers: List[str] = []
+    rows: List[List[str]] = []
+    html: Optional[str] = None
+    clean_tsv: Optional[str] = None
+
+
+class TaxRateSummary(BaseModel):
+    detected_tax_rates: List[str] = Field(..., description="Unique tax rates identified across line items and tables (e.g. ['5%', '18%'])")
+    cgst_rates: List[str] = []
+    sgst_rates: List[str] = []
+    igst_rates: List[str] = []
+
+
+class ValidateBillResponse(BaseModel):
+    filename: str
+    s3_bucket: str
+    s3_key: str
+    status: str
+    tax_rates: TaxRateSummary
+    line_items: List[LineItem]
+    tables: List[ExtractedTable]
+    formatted_document_text: str
 
 
 # ---------------------------------------------------------------------------
@@ -568,6 +626,396 @@ async def chat(request: ChatRequest):
     )
 
 
+# ---------------------------------------------------------------------------
+# Bill Validation / AWS Textract & Unstructured Extraction Helpers
+# ---------------------------------------------------------------------------
+def parse_safe_float(val: Any) -> Optional[float]:
+    """Extracts float from a numeric string, handling currency symbols and commas."""
+    if val is None:
+        return None
+    cleaned = re.sub(r'[^\d.-]', '', str(val).strip())
+    try:
+        return float(cleaned) if cleaned else None
+    except ValueError:
+        return None
+
+
+def parse_textract_tables_and_lines(
+    blocks: List[Dict[str, Any]]
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[str]]:
+    """
+    Reconstructs tables, line items, and raw text lines from AWS Textract blocks.
+    """
+    block_map = {b["Id"]: b for b in blocks if "Id" in b}
+    tables: List[Dict[str, Any]] = []
+    line_items: List[Dict[str, Any]] = []
+    raw_lines: List[str] = []
+
+    for b in blocks:
+        if b.get("BlockType") == "LINE" and b.get("Text"):
+            raw_lines.append(b["Text"].strip())
+
+    table_blocks = [b for b in blocks if b.get("BlockType") == "TABLE"]
+
+    for t_idx, t_block in enumerate(table_blocks):
+        cell_ids = []
+        for rel in t_block.get("Relationships", []):
+            if rel.get("Type") == "CHILD":
+                cell_ids.extend(rel.get("Ids", []))
+
+        cells = [block_map[cid] for cid in cell_ids if cid in block_map]
+        if not cells:
+            continue
+
+        max_row = max(c.get("RowIndex", 1) for c in cells)
+        max_col = max(c.get("ColumnIndex", 1) for c in cells)
+
+        grid = [["" for _ in range(max_col)] for _ in range(max_row)]
+
+        for c in cells:
+            r = c.get("RowIndex", 1) - 1
+            col = c.get("ColumnIndex", 1) - 1
+            cell_text_parts = []
+            for rel in c.get("Relationships", []):
+                if rel.get("Type") == "CHILD":
+                    for wid in rel.get("Ids", []):
+                        if wid in block_map and "Text" in block_map[wid]:
+                            cell_text_parts.append(block_map[wid]["Text"])
+            cell_text = " ".join(cell_text_parts).strip()
+            if 0 <= r < max_row and 0 <= col < max_col:
+                grid[r][col] = cell_text
+
+        headers = grid[0] if len(grid) > 0 else []
+        rows = grid[1:] if len(grid) > 1 else []
+
+        # Construct clean HTML representation
+        html_rows = []
+        if headers:
+            html_rows.append("<thead><tr>" + "".join(f"<th>{h}</th>" for h in headers) + "</tr></thead>")
+        body_rows = ["<tr>" + "".join(f"<td>{val}</td>" for val in r) + "</tr>" for r in rows]
+        html_str = f"<table>{''.join(html_rows)}<tbody>{''.join(body_rows)}</tbody></table>"
+
+        tables.append({
+            "table_index": t_idx + 1,
+            "rows_count": len(grid),
+            "columns_count": max_col,
+            "headers": headers,
+            "rows": rows,
+            "html": html_str
+        })
+
+        # Match columns to line item attributes
+        header_map: Dict[str, int] = {}
+        for c_idx, h in enumerate(headers):
+            h_lower = h.lower()
+            if any(k in h_lower for k in ["desc", "item", "particular", "product", "goods", "service"]):
+                header_map["description"] = c_idx
+            elif any(k in h_lower for k in ["hsn", "sac"]):
+                header_map["hsn_sac"] = c_idx
+            elif any(k in h_lower for k in ["qty", "quantity", "nos", "units"]):
+                header_map["qty"] = c_idx
+            elif any(k in h_lower for k in ["rate", "price", "unit price"]):
+                header_map["unit_price"] = c_idx
+            elif any(k in h_lower for k in ["taxable", "taxable val", "amount"]):
+                header_map["taxable_amount"] = c_idx
+            elif "cgst" in h_lower and ("rate" in h_lower or "%" in h_lower):
+                header_map["cgst_rate"] = c_idx
+            elif "cgst" in h_lower and ("amt" in h_lower or "amount" in h_lower):
+                header_map["cgst_amount"] = c_idx
+            elif "sgst" in h_lower and ("rate" in h_lower or "%" in h_lower):
+                header_map["sgst_rate"] = c_idx
+            elif "sgst" in h_lower and ("amt" in h_lower or "amount" in h_lower):
+                header_map["sgst_amount"] = c_idx
+            elif "igst" in h_lower and ("rate" in h_lower or "%" in h_lower):
+                header_map["igst_rate"] = c_idx
+            elif "igst" in h_lower and ("amt" in h_lower or "amount" in h_lower):
+                header_map["igst_amount"] = c_idx
+            elif any(k in h_lower for k in ["total", "net amount"]):
+                header_map["total_amount"] = c_idx
+
+        for row in rows:
+            if not any(val.strip() for val in row):
+                continue
+            desc = row[header_map["description"]] if "description" in header_map and header_map["description"] < len(row) else None
+            hsn = row[header_map["hsn_sac"]] if "hsn_sac" in header_map and header_map["hsn_sac"] < len(row) else None
+
+            # Skip summary/total lines
+            if desc and any(k in desc.lower() for k in ["total", "sub total", "grand total", "round off"]):
+                continue
+
+            item = {
+                "item_description": desc or (row[0] if len(row) > 0 else None),
+                "hsn_sac": hsn,
+                "quantity": parse_safe_float(row[header_map["qty"]]) if "qty" in header_map and header_map["qty"] < len(row) else None,
+                "unit_price": parse_safe_float(row[header_map["unit_price"]]) if "unit_price" in header_map and header_map["unit_price"] < len(row) else None,
+                "taxable_amount": parse_safe_float(row[header_map["taxable_amount"]]) if "taxable_amount" in header_map and header_map["taxable_amount"] < len(row) else None,
+                "cgst_rate": row[header_map["cgst_rate"]] if "cgst_rate" in header_map and header_map["cgst_rate"] < len(row) else None,
+                "cgst_amount": parse_safe_float(row[header_map["cgst_amount"]]) if "cgst_amount" in header_map and header_map["cgst_amount"] < len(row) else None,
+                "sgst_rate": row[header_map["sgst_rate"]] if "sgst_rate" in header_map and header_map["sgst_rate"] < len(row) else None,
+                "sgst_amount": parse_safe_float(row[header_map["sgst_amount"]]) if "sgst_amount" in header_map and header_map["sgst_amount"] < len(row) else None,
+                "igst_rate": row[header_map["igst_rate"]] if "igst_rate" in header_map and header_map["igst_rate"] < len(row) else None,
+                "igst_amount": parse_safe_float(row[header_map["igst_amount"]]) if "igst_amount" in header_map and header_map["igst_amount"] < len(row) else None,
+                "total_amount": parse_safe_float(row[header_map["total_amount"]]) if "total_amount" in header_map and header_map["total_amount"] < len(row) else None,
+            }
+            line_items.append(item)
+
+    return tables, line_items, raw_lines
+
+
+def format_textract_with_unstructured(
+    tables: List[Dict[str, Any]],
+    raw_lines: List[str]
+) -> Tuple[str, List[ExtractedTable]]:
+    """
+    Uses the unstructured library to format Textract's table grids and text lines cleanly.
+    """
+    unstructured_elements = []
+    formatted_tables: List[ExtractedTable] = []
+
+    for t in tables:
+        grid = [t["headers"]] + t["rows"]
+        cleaned_grid = [[clean_extra_whitespace(c) for c in row] for row in grid]
+        tsv_text = "\n".join(["\t".join(row) for row in cleaned_grid if any(row)])
+
+        table_elem = UnstructuredTable(
+            text=tsv_text,
+            metadata=ElementMetadata(text_as_html=t["html"])
+        )
+        unstructured_elements.append(table_elem)
+        formatted_tables.append(ExtractedTable(
+            table_index=t["table_index"],
+            rows_count=len(cleaned_grid),
+            columns_count=t["columns_count"],
+            headers=cleaned_grid[0] if cleaned_grid else [],
+            rows=cleaned_grid[1:] if len(cleaned_grid) > 1 else [],
+            html=t["html"],
+            clean_tsv=tsv_text
+        ))
+
+    cleaned_lines = [clean_extra_whitespace(line) for line in raw_lines if line.strip()]
+    for line in cleaned_lines:
+        unstructured_elements.append(UnstructuredText(text=line))
+
+    formatted_text = "\n\n".join([str(elem) for elem in unstructured_elements])
+    return formatted_text, formatted_tables
+
+
+def extract_tax_rates_summary(
+    tables: List[Dict[str, Any]],
+    line_items: List[Dict[str, Any]],
+    raw_text: str
+) -> TaxRateSummary:
+    """
+    Extracts all GST tax rates (CGST, SGST, IGST, and composite GST rates)
+    from extracted invoice tables, line items, and raw text.
+    """
+    gst_percent_regex = re.compile(r'\b(0|0\.1|0\.25|1\.5|3|5|6|9|12|14|18|28)(?:\.0+)?\s*%', re.IGNORECASE)
+    cgst_regex = re.compile(r'(?:CGST|Central\s+GST)\s*[@:]?\s*(\d+(?:\.\d+)?)\s*%', re.IGNORECASE)
+    sgst_regex = re.compile(r'(?:SGST|UTGST|State\s+GST)\s*[@:]?\s*(\d+(?:\.\d+)?)\s*%', re.IGNORECASE)
+    igst_regex = re.compile(r'(?:IGST|Integrated\s+GST)\s*[@:]?\s*(\d+(?:\.\d+)?)\s*%', re.IGNORECASE)
+
+    found_rates = set(gst_percent_regex.findall(raw_text))
+    cgst_rates = set(cgst_regex.findall(raw_text))
+    sgst_rates = set(sgst_regex.findall(raw_text))
+    igst_rates = set(igst_regex.findall(raw_text))
+
+    for item in line_items:
+        for key, target_set in [
+            ("cgst_rate", cgst_rates),
+            ("sgst_rate", sgst_rates),
+            ("igst_rate", igst_rates),
+            ("total_tax_rate", found_rates)
+        ]:
+            val = str(item.get(key) or "")
+            m = re.findall(r'(\d+(?:\.\d+)?)\s*%', val)
+            target_set.update(m)
+
+    def normalize(rate_set):
+        return sorted(list(set(f"{float(r):g}%" for r in rate_set if r)), key=lambda x: float(x.rstrip('%')))
+
+    norm_cgst = normalize(cgst_rates)
+    norm_sgst = normalize(sgst_rates)
+    norm_igst = normalize(igst_rates)
+    all_norm = set(normalize(found_rates))
+
+    # Pairwise inference (CGST 9% + SGST 9% -> 18% total GST)
+    if "9%" in norm_cgst and "9%" in norm_sgst:
+        all_norm.add("18%")
+    if "6%" in norm_cgst and "6%" in norm_sgst:
+        all_norm.add("12%")
+    if "2.5%" in norm_cgst and "2.5%" in norm_sgst:
+        all_norm.add("5%")
+    if "14%" in norm_cgst and "14%" in norm_sgst:
+        all_norm.add("28%")
+    all_norm.update(norm_igst)
+
+    sorted_detected_rates = sorted(list(all_norm), key=lambda x: float(x.rstrip('%'))) if all_norm else []
+
+    return TaxRateSummary(
+        detected_tax_rates=sorted_detected_rates,
+        cgst_rates=norm_cgst,
+        sgst_rates=norm_sgst,
+        igst_rates=norm_igst
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /validate-bill Endpoint
+# ---------------------------------------------------------------------------
+@app.post("/validate-bill", response_model=ValidateBillResponse, tags=["Invoice Validation"])
+async def validate_bill(file: UploadFile = File(...)):
+    """
+    POST /validate-bill Endpoint
+    1. Accepts a PDF or image file upload via UploadFile.
+    2. Uses boto3 to temporarily upload this file to S3 bucket 'gst-rag-invoices-slash-495'.
+    3. Triggers AWS Textract on this S3 object to extract tables and line items.
+    4. Uses the unstructured library to format Textract's output cleanly.
+    5. Returns the extracted tax rates, line items, and tables as a JSON response.
+    6. Cleans up the temporary S3 object.
+    """
+    filename = file.filename or "invoice_upload"
+    ext = Path(filename).suffix.lower()
+    valid_exts = {".pdf", ".png", ".jpg", ".jpeg", ".tiff", ".tif"}
+    if ext not in valid_exts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file format '{ext}'. Supported formats: PDF, PNG, JPG, JPEG, TIFF."
+        )
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty."
+        )
+
+    # Configure AWS Session
+    session_kwargs = {"region_name": AWS_REGION}
+    if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+        session_kwargs["aws_access_key_id"] = AWS_ACCESS_KEY_ID
+        session_kwargs["aws_secret_access_key"] = AWS_SECRET_ACCESS_KEY
+
+    try:
+        s3 = boto3.client("s3", **session_kwargs)
+        textract = boto3.client("textract", **session_kwargs)
+    except Exception as e:
+        logger.error(f"Failed to initialize AWS clients: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"AWS service initialization failed: {str(e)}"
+        )
+
+    s3_key = f"temp_uploads/{uuid.uuid4().hex}_{filename}"
+    uploaded = False
+
+    try:
+        # 1. Temporarily upload to S3 bucket
+        logger.info(f"Uploading file '{filename}' temporarily to s3://{S3_INVOICE_BUCKET}/{s3_key}...")
+        await asyncio.to_thread(
+            lambda: s3.put_object(
+                Bucket=S3_INVOICE_BUCKET,
+                Key=s3_key,
+                Body=file_bytes,
+                ContentType=file.content_type or "application/octet-stream"
+            )
+        )
+        uploaded = True
+        logger.info("Uploaded successfully to S3.")
+
+        # 2. Trigger AWS Textract on the S3 object
+        logger.info(f"Triggering AWS Textract on s3://{S3_INVOICE_BUCKET}/{s3_key}...")
+        blocks = []
+        try:
+            res = await asyncio.to_thread(
+                lambda: textract.analyze_document(
+                    Document={"S3Object": {"Bucket": S3_INVOICE_BUCKET, "Name": s3_key}},
+                    FeatureTypes=["TABLES", "FORMS"]
+                )
+            )
+            blocks = res.get("Blocks", [])
+        except ClientError as ce:
+            err_code = ce.response.get("Error", {}).get("Code", "")
+            err_msg = ce.response.get("Error", {}).get("Message", str(ce))
+            if "UnsupportedDocumentException" in err_code or "multi-page" in err_msg.lower():
+                logger.info("Multi-page PDF detected; triggering async start_document_analysis...")
+                job_res = await asyncio.to_thread(
+                    lambda: textract.start_document_analysis(
+                        DocumentLocation={"S3Object": {"Bucket": S3_INVOICE_BUCKET, "Name": s3_key}},
+                        FeatureTypes=["TABLES", "FORMS"]
+                    )
+                )
+                job_id = job_res["JobId"]
+                while True:
+                    await asyncio.sleep(2)
+                    poll_res = await asyncio.to_thread(
+                        lambda: textract.get_document_analysis(JobId=job_id)
+                    )
+                    status_val = poll_res.get("JobStatus")
+                    if status_val == "SUCCEEDED":
+                        blocks = poll_res.get("Blocks", [])
+                        next_tok = poll_res.get("NextToken")
+                        while next_tok:
+                            more_res = await asyncio.to_thread(
+                                lambda: textract.get_document_analysis(JobId=job_id, NextToken=next_tok)
+                            )
+                            blocks.extend(more_res.get("Blocks", []))
+                            next_tok = more_res.get("NextToken")
+                        break
+                    elif status_val == "FAILED":
+                        raise RuntimeError(f"Textract analysis job failed: {poll_res.get('StatusMessage')}")
+            else:
+                raise
+
+        # 3. Extract tables, line items, and raw lines
+        raw_tables, raw_line_items, raw_lines = parse_textract_tables_and_lines(blocks)
+
+        # 4. Format cleanly using the unstructured library
+        formatted_text, structured_tables = format_textract_with_unstructured(raw_tables, raw_lines)
+
+        # 5. Extract GST tax rates summary
+        full_text_corpus = formatted_text + "\n" + "\n".join(raw_lines)
+        tax_summary = extract_tax_rates_summary(raw_tables, raw_line_items, full_text_corpus)
+
+        structured_line_items = [LineItem(**item) for item in raw_line_items]
+
+        return ValidateBillResponse(
+            filename=filename,
+            s3_bucket=S3_INVOICE_BUCKET,
+            s3_key=s3_key,
+            status="success",
+            tax_rates=tax_summary,
+            line_items=structured_line_items,
+            tables=structured_tables,
+            formatted_document_text=formatted_text
+        )
+
+    except ClientError as ce:
+        err_msg = ce.response.get("Error", {}).get("Message", str(ce))
+        err_code = ce.response.get("Error", {}).get("Code", "")
+        logger.error(f"AWS Error ({err_code}): {err_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"AWS Textract/S3 error ({err_code}): {err_msg}"
+        )
+    except Exception as e:
+        logger.error(f"Bill validation failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to process bill validation: {str(e)}"
+        )
+    finally:
+        # Clean up temporary S3 object
+        if uploaded:
+            try:
+                await asyncio.to_thread(
+                    lambda: s3.delete_object(Bucket=S3_INVOICE_BUCKET, Key=s3_key)
+                )
+                logger.info(f"Cleaned up temporary S3 object 's3://{S3_INVOICE_BUCKET}/{s3_key}'.")
+            except Exception as del_err:
+                logger.warning(f"Could not delete temporary S3 object: {del_err}")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
