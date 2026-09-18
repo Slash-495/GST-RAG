@@ -1,0 +1,68 @@
+# ==============================================================================
+# Docker Ignore Configuration for GST RAG Backend
+# ==============================================================================
+
+# Secrets and environment files
+.env
+.env.*
+*.env
+
+# Virtual environment directories
+.venv
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Data directory (Vectorstore, raw documents, and metadata)
+# Note: Mount data/ at runtime as a volume (-v $(pwd)/data:/app/data:ro)
+data
+data/
+**/data/**
+
+# Git repository and version control
+.git
+.git/
+.gitignore
+.gitattributes
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Packaging and distribution
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing, coverage, and caches
+.cache/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# IDE and OS artifacts
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
