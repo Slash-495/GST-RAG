@@ -4,3 +4,13 @@ faiss-cpu>=1.8.0
 python-dotenv>=1.0.0
 numpy>=1.26.0
 tqdm>=4.66.0
+fastapi
+uvicorn
+langchain
+langchain-google-genai
+cohere
+supabase
+rank_bm25
+boto3
+python-multipart
+unstructured
