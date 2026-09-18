@@ -14,3 +14,5 @@ rank_bm25
 boto3
 python-multipart
 unstructured
+streamlit
+requests

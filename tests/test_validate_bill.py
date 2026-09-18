@@ -1,3 +1,4 @@
+import os
 import sys
 import io
 import asyncio
@@ -117,14 +118,24 @@ async def test_bill_validation():
 
         mock_s3.put_object.assert_called_once()
         uploaded_bucket = mock_s3.put_object.call_args[1]['Bucket']
-        assert uploaded_bucket == 'gst-rag-invoices-slash-495', f'Wrong bucket: {uploaded_bucket}'
+        expected_bucket = os.getenv("S3_BUCKET_NAME", "gst-rag-invoices-slash-020")
+        assert uploaded_bucket == expected_bucket, f'Wrong bucket: {uploaded_bucket}'
 
         mock_textract.analyze_document.assert_called_once()
         textract_doc = mock_textract.analyze_document.call_args[1]['Document']['S3Object']
-        assert textract_doc['Bucket'] == 'gst-rag-invoices-slash-495'
+        assert textract_doc['Bucket'] == expected_bucket
 
         mock_s3.delete_object.assert_called_once()
-        print('S3 temporary object deletion confirmed in finally block.')
+        deleted_bucket = mock_s3.delete_object.call_args[1]['Bucket']
+        assert deleted_bucket == expected_bucket, f'Wrong deleted bucket: {deleted_bucket}'
+        print(f'S3 temporary object deletion confirmed in finally block for bucket: {deleted_bucket}')
+
+        # Verify AWS region configuration passed to boto3 clients
+        expected_region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "ap-south-1"))
+        for call_args in mock_boto.call_args_list:
+            region_arg = call_args[1].get('region_name')
+            assert region_arg == expected_region, f'Expected region {expected_region}, got {region_arg}'
+        print(f'AWS clients verified with region: {expected_region}')
 
         assert response.status == 'success'
         assert len(response.tax_rates.detected_tax_rates) > 0

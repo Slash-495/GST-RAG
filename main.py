@@ -59,8 +59,9 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY
 
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-S3_INVOICE_BUCKET = os.getenv("S3_INVOICE_BUCKET", "gst-rag-invoices-slash-495")
+AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "ap-south-1"))
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "gst-rag-invoices-slash-020")
+S3_INVOICE_BUCKET = S3_BUCKET_NAME  # Backward-compatible alias
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -867,11 +868,11 @@ async def validate_bill(file: UploadFile = File(...)):
     """
     POST /validate-bill Endpoint
     1. Accepts a PDF or image file upload via UploadFile.
-    2. Uses boto3 to temporarily upload this file to S3 bucket 'gst-rag-invoices-slash-495'.
+    2. Uses boto3 to temporarily upload this file to the dynamically configured S3 bucket.
     3. Triggers AWS Textract on this S3 object to extract tables and line items.
     4. Uses the unstructured library to format Textract's output cleanly.
     5. Returns the extracted tax rates, line items, and tables as a JSON response.
-    6. Cleans up the temporary S3 object.
+    6. Cleans up the temporary S3 object in a finally block.
     """
     filename = file.filename or "invoice_upload"
     ext = Path(filename).suffix.lower()
@@ -889,8 +890,12 @@ async def validate_bill(file: UploadFile = File(...)):
             detail="Uploaded file is empty."
         )
 
+    # Dynamically resolve AWS Region and S3 Bucket Name
+    aws_region = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "ap-south-1"))
+    bucket_name = os.getenv("S3_BUCKET_NAME", "gst-rag-invoices-slash-020")
+
     # Configure AWS Session
-    session_kwargs = {"region_name": AWS_REGION}
+    session_kwargs = {"region_name": aws_region}
     if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
         session_kwargs["aws_access_key_id"] = AWS_ACCESS_KEY_ID
         session_kwargs["aws_secret_access_key"] = AWS_SECRET_ACCESS_KEY
@@ -910,10 +915,10 @@ async def validate_bill(file: UploadFile = File(...)):
 
     try:
         # 1. Temporarily upload to S3 bucket
-        logger.info(f"Uploading file '{filename}' temporarily to s3://{S3_INVOICE_BUCKET}/{s3_key}...")
+        logger.info(f"Uploading file '{filename}' temporarily to s3://{bucket_name}/{s3_key} (region: {aws_region})...")
         await asyncio.to_thread(
             lambda: s3.put_object(
-                Bucket=S3_INVOICE_BUCKET,
+                Bucket=bucket_name,
                 Key=s3_key,
                 Body=file_bytes,
                 ContentType=file.content_type or "application/octet-stream"
@@ -923,12 +928,12 @@ async def validate_bill(file: UploadFile = File(...)):
         logger.info("Uploaded successfully to S3.")
 
         # 2. Trigger AWS Textract on the S3 object
-        logger.info(f"Triggering AWS Textract on s3://{S3_INVOICE_BUCKET}/{s3_key}...")
+        logger.info(f"Triggering AWS Textract on s3://{bucket_name}/{s3_key}...")
         blocks = []
         try:
             res = await asyncio.to_thread(
                 lambda: textract.analyze_document(
-                    Document={"S3Object": {"Bucket": S3_INVOICE_BUCKET, "Name": s3_key}},
+                    Document={"S3Object": {"Bucket": bucket_name, "Name": s3_key}},
                     FeatureTypes=["TABLES", "FORMS"]
                 )
             )
@@ -940,7 +945,7 @@ async def validate_bill(file: UploadFile = File(...)):
                 logger.info("Multi-page PDF detected; triggering async start_document_analysis...")
                 job_res = await asyncio.to_thread(
                     lambda: textract.start_document_analysis(
-                        DocumentLocation={"S3Object": {"Bucket": S3_INVOICE_BUCKET, "Name": s3_key}},
+                        DocumentLocation={"S3Object": {"Bucket": bucket_name, "Name": s3_key}},
                         FeatureTypes=["TABLES", "FORMS"]
                     )
                 )
@@ -980,7 +985,7 @@ async def validate_bill(file: UploadFile = File(...)):
 
         return ValidateBillResponse(
             filename=filename,
-            s3_bucket=S3_INVOICE_BUCKET,
+            s3_bucket=bucket_name,
             s3_key=s3_key,
             status="success",
             tax_rates=tax_summary,
@@ -1008,11 +1013,12 @@ async def validate_bill(file: UploadFile = File(...)):
         if uploaded:
             try:
                 await asyncio.to_thread(
-                    lambda: s3.delete_object(Bucket=S3_INVOICE_BUCKET, Key=s3_key)
+                    lambda: s3.delete_object(Bucket=bucket_name, Key=s3_key)
                 )
-                logger.info(f"Cleaned up temporary S3 object 's3://{S3_INVOICE_BUCKET}/{s3_key}'.")
+                logger.info(f"Cleaned up temporary S3 object 's3://{bucket_name}/{s3_key}'.")
             except Exception as del_err:
                 logger.warning(f"Could not delete temporary S3 object: {del_err}")
+
 
 
 if __name__ == "__main__":
