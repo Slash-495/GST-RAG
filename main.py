@@ -13,6 +13,8 @@ import re
 import time
 import pickle
 import logging
+import asyncio
+from datetime import datetime, timezone
 from pathlib import Path
 from contextlib import asynccontextmanager
 from typing import List, Dict, Any, Optional
@@ -30,6 +32,7 @@ import warnings
 warnings.filterwarnings("ignore")
 import google.generativeai as genai
 import cohere
+from supabase import create_client, Client
 
 # Configure logging
 logging.basicConfig(
@@ -42,11 +45,24 @@ logger = logging.getLogger("gst_chat_backend")
 load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 else:
     logger.warning("GEMINI_API_KEY is missing from environment / .env")
+
+# Initialize Supabase Client
+supabase_client: Optional[Client] = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        logger.info("Supabase client initialized successfully.")
+    except Exception as e:
+        logger.warning(f"Failed to initialize Supabase client: {e}")
+else:
+    logger.warning("SUPABASE_URL or SUPABASE_KEY missing from environment / .env. Supabase chat logging is disabled.")
 
 # Paths (read-only)
 BASE_DIR = Path(__file__).resolve().parent
@@ -326,6 +342,45 @@ def rerank_top_chunks(
 
 
 # ---------------------------------------------------------------------------
+# Supabase Logging Utility
+# ---------------------------------------------------------------------------
+async def log_chat_to_supabase(
+    query: str,
+    response: str,
+    timestamp: Optional[str] = None
+) -> None:
+    """
+    Asynchronously logs incoming /chat queries, generated Gemini responses,
+    and timestamps into a Supabase Postgres table named 'chat_logs'.
+    Handles any Supabase insertion errors gracefully so they don't crash the API.
+    """
+    if not supabase_client:
+        logger.debug("Supabase client not initialized; skipping chat_logs insertion.")
+        return
+
+    if timestamp is None:
+        timestamp = datetime.now(timezone.utc).isoformat()
+
+    record = {
+        "query": query,
+        "response": response,
+        "timestamp": timestamp,
+    }
+
+    try:
+        # Offload synchronous PostgREST call to thread pool to keep the event loop non-blocking
+        await asyncio.to_thread(
+            lambda: supabase_client.table("chat_logs").insert(record).execute()
+        )
+        logger.info("Successfully logged chat interaction to Supabase table 'chat_logs'.")
+    except Exception as e:
+        logger.warning(
+            f"Supabase insertion error into 'chat_logs': {e}. "
+            "Handled gracefully; request will proceed normally."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
 @app.get("/")
@@ -358,13 +413,14 @@ def health():
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["Chat"])
-def chat(request: ChatRequest):
+async def chat(request: ChatRequest):
     """
     POST /chat Endpoint
     1. Runs hybrid search fetching top 10 from FAISS and top 10 from BM25.
     2. Deduplicates results into unique candidate chunks.
     3. Sends combined chunks to Cohere Rerank API to extract top 4 most relevant chunks.
     4. Passes the 4 chunks to Gemini LLM to generate a plain-language answer citing specific GST sections.
+    5. Asynchronously logs query, response, and timestamp to Supabase table 'chat_logs'.
     """
     if not getattr(app.state, "is_ready", False):
         raise HTTPException(
@@ -375,9 +431,16 @@ def chat(request: ChatRequest):
     # 1 & 2. Hybrid search & deduplication
     candidate_docs = run_hybrid_search(request.query, app)
     if not candidate_docs:
+        no_res_answer = "No relevant GST statutory provisions or rules were found matching your query."
+        log_timestamp = datetime.now(timezone.utc).isoformat()
+        await log_chat_to_supabase(
+            query=request.query,
+            response=no_res_answer,
+            timestamp=log_timestamp
+        )
         return ChatResponse(
             query=request.query,
-            answer="No relevant GST statutory provisions or rules were found matching your query.",
+            answer=no_res_answer,
             citations=[],
             top_chunks=[],
             rerank_engine="none"
@@ -487,6 +550,14 @@ def chat(request: ChatRequest):
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Failed to generate answer from Gemini LLM: {str(last_err)}"
         )
+
+    # Log incoming query, generated Gemini response, and timestamp to Supabase table 'chat_logs'
+    log_timestamp = datetime.now(timezone.utc).isoformat()
+    await log_chat_to_supabase(
+        query=request.query,
+        response=answer_text,
+        timestamp=log_timestamp
+    )
 
     return ChatResponse(
         query=request.query,

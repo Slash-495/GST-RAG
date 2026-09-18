@@ -35,10 +35,10 @@ async def test_chat():
 
         assert len(top_4) <= 4, "Reranking should return at most 4 chunks"
 
-        # 3. Test Full POST /chat endpoint
+        # 3. Test Full POST /chat Endpoint (Async)
         print("\n--- Testing Full POST /chat Endpoint ---")
         req = main.ChatRequest(query=query)
-        response = main.chat(req)
+        response = await main.chat(req)
 
         print("\n=== Chat Response ===")
         print(f"Query: {response.query}\n")
@@ -53,7 +53,31 @@ async def test_chat():
         assert len(response.citations) > 0, "Missing citations"
         assert any("17" in c.section or "credit" in c.title.lower() for c in response.citations), "Section 17 missing from citations"
 
-        print("\nAll POST /chat tests passed successfully!")
+        # 4. Test Supabase error handling resilience
+        print("\n--- Testing Supabase Logging & Exception Handling ---")
+        # Test 4a: Default/uninitialized state
+        await main.log_chat_to_supabase("Test query", "Test response")
+        print("Test 4a passed: Graceful no-op when client is uninitialized.")
+
+        # Test 4b: Simulated failing client that raises an exception
+        class FailingMockTable:
+            def insert(self, record):
+                raise RuntimeError("Simulated database connection failure")
+
+        class FailingMockClient:
+            def table(self, table_name):
+                return FailingMockTable()
+
+        original_client = main.supabase_client
+        try:
+            main.supabase_client = FailingMockClient()
+            # Must not raise exception
+            await main.log_chat_to_supabase("Test query", "Test response")
+            print("Test 4b passed: Supabase insertion error handled gracefully without raising.")
+        finally:
+            main.supabase_client = original_client
+
+        print("\nAll POST /chat and Supabase tests passed successfully!")
 
 if __name__ == "__main__":
     asyncio.run(test_chat())
