@@ -1,0 +1,22 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Environment Variables
+.env
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Vector store & local artifacts (can be committed or kept local)
+# data/vectorstore/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+data/
