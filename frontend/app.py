@@ -32,7 +32,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-DEFAULT_BACKEND_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
+DEFAULT_BACKEND_URL = os.getenv("BACKEND_API_URL", "https://chambersandinfrastructures.onrender.com")
 DEFAULT_API_KEY = os.getenv("API_SECURITY_KEY", os.getenv("X_API_KEY", "chambers-gst-sec-key-2026"))
 
 # -----------------------------------------------------------------------------
