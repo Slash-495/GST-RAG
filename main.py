@@ -20,7 +20,22 @@ from contextlib import asynccontextmanager
 from typing import List, Dict, Any, Optional, Tuple
 import uuid
 
-import faiss
+try:
+    import faiss
+except ModuleNotFoundError:
+    raise ImportError(
+        "\n\n"
+        "===============================================================================\n"
+        "[ERROR] 'faiss' is not installed in the current Python environment!\n"
+        "You are running the global system Python instead of the project virtual environment (.venv).\n\n"
+        "To start the server, run using the project virtual environment:\n"
+        "    .venv\\Scripts\\python.exe -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload\n\n"
+        "Or activate the virtual environment in your terminal first:\n"
+        "    .venv\\Scripts\\Activate.ps1\n"
+        "    uvicorn main:app --host 0.0.0.0 --port 8000 --reload\n"
+        "===============================================================================\n"
+    ) from None
+
 import numpy as np
 import boto3
 from botocore.exceptions import ClientError
