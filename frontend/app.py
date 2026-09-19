@@ -32,7 +32,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-DEFAULT_BACKEND_URL = os.getenv("BACKEND_API_URL", "https://chambersandinfrastructures.onrender.com")
+LIVE_RENDER_URL = "https://chambersandinfrastructures.onrender.com"
+raw_env_backend = os.getenv("BACKEND_API_URL", "").strip()
+# If env is unset or points to localhost/127.0.0.1, prioritize the live Render URL
+if not raw_env_backend or "localhost" in raw_env_backend or "127.0.0.1" in raw_env_backend:
+    DEFAULT_BACKEND_URL = LIVE_RENDER_URL
+else:
+    DEFAULT_BACKEND_URL = raw_env_backend
 DEFAULT_API_KEY = os.getenv("API_SECURITY_KEY", os.getenv("X_API_KEY", "chambers-gst-sec-key-2026"))
 
 # -----------------------------------------------------------------------------
@@ -734,7 +740,7 @@ st.markdown(LEGAL_THEME_CSS, unsafe_allow_html=True)
 def check_backend_health(base_url: str) -> Dict[str, Any]:
     """Pings backend health endpoint to check service status."""
     try:
-        resp = requests.get(f"{base_url}/health", timeout=1.0)
+        resp = requests.get(f"{base_url}/health", timeout=3.5)
         if resp.status_code == 200:
             return {"online": True, "data": resp.json()}
         return {"online": False, "error": f"HTTP {resp.status_code}"}
@@ -756,9 +762,25 @@ with st.sidebar:
     st.markdown('<div class="legal-badge">SYSTEM DIAGNOSTICS</div>', unsafe_allow_html=True)
     st.markdown("### ⚖️ Chambers & Infrastructure")
 
+    # Auto-migrate session state if it still contains localhost/127.0.0.1
+    if "backend_api_url_input" not in st.session_state:
+        st.session_state["backend_api_url_input"] = DEFAULT_BACKEND_URL
+    elif "localhost" in str(st.session_state.get("backend_api_url_input", "")) or "127.0.0.1" in str(st.session_state.get("backend_api_url_input", "")):
+        st.session_state["backend_api_url_input"] = DEFAULT_BACKEND_URL
+
+    col_toggle1, col_toggle2 = st.columns(2)
+    with col_toggle1:
+        if st.button("🌐 Live Render", help="Point to live Render cloud backend", use_container_width=True):
+            st.session_state["backend_api_url_input"] = LIVE_RENDER_URL
+            st.rerun()
+    with col_toggle2:
+        if st.button("💻 Localhost", help="Point to local development server (port 8000)", use_container_width=True):
+            st.session_state["backend_api_url_input"] = "http://localhost:8000"
+            st.rerun()
+
     backend_url = st.text_input(
         "Backend API Base URL",
-        value=DEFAULT_BACKEND_URL,
+        key="backend_api_url_input",
         help="FastAPI instance hosting hybrid retrieval, reranking, and invoice audit endpoints."
     ).rstrip("/")
 
@@ -788,7 +810,10 @@ with st.sidebar:
             unsafe_allow_html=True
         )
         st.caption(f"Notice: {health_status.get('error', 'Cannot connect to backend')}")
-        st.info("Start the backend server using:\n`python -m uvicorn main:app --port 8000`")
+        if "onrender.com" in backend_url:
+            st.warning("Render free tier instances sleep after inactivity and take ~50s to wake up. If this is a new deploy, verify the service is active on Render or toggle to Localhost above.")
+        else:
+            st.info("Start the backend server using:\n`python -m uvicorn main:app --port 8000`")
 
     st.divider()
 
@@ -1021,10 +1046,17 @@ with tab_chat:
                         })
 
                 except requests.exceptions.ConnectionError:
-                    err_msg = (
-                        "**Connection Unavailable**: Unable to communicate with the FastAPI service at `"
-                        f"{backend_url}`. Please verify that the application server is active (`uvicorn main:app --port 8000`)."
-                    )
+                    if "onrender.com" in backend_url:
+                        err_msg = (
+                            f"**Connection Unavailable**: Unable to communicate with the Render cloud service at `{backend_url}`. "
+                            "Render free tier instances sleep when idle and take ~30–50 seconds to wake up. "
+                            "If your Render service is not yet deployed, verify the service in your Render dashboard or click **💻 Localhost** in the sidebar."
+                        )
+                    else:
+                        err_msg = (
+                            f"**Connection Unavailable**: Unable to communicate with the FastAPI service at `{backend_url}`. "
+                            "Please verify that the local application server is active (`uvicorn main:app --port 8000`)."
+                        )
                     st.error(err_msg)
                     st.session_state.messages.append({
                         "role": "assistant",
