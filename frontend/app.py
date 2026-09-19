@@ -32,7 +32,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-LIVE_RENDER_URL = "https://chambersandinfrastructures.onrender.com"
+LIVE_RENDER_URL = "https://chambersandinfastructures.onrender.com"
 raw_env_backend = os.getenv("BACKEND_API_URL", "").strip()
 # If env is unset or points to localhost/127.0.0.1, prioritize the live Render URL
 if not raw_env_backend or "localhost" in raw_env_backend or "127.0.0.1" in raw_env_backend:
@@ -762,34 +762,14 @@ with st.sidebar:
     st.markdown('<div class="legal-badge">SYSTEM DIAGNOSTICS</div>', unsafe_allow_html=True)
     st.markdown("### ⚖️ Chambers & Infrastructure")
 
-    # Auto-migrate session state if it still contains localhost/127.0.0.1
-    if "backend_api_url_input" not in st.session_state:
-        st.session_state["backend_api_url_input"] = DEFAULT_BACKEND_URL
-    elif "localhost" in str(st.session_state.get("backend_api_url_input", "")) or "127.0.0.1" in str(st.session_state.get("backend_api_url_input", "")):
-        st.session_state["backend_api_url_input"] = DEFAULT_BACKEND_URL
+    # Ensure backend_url and api_key are set to live production defaults
+    if "backend_url" not in st.session_state or "localhost" in str(st.session_state.backend_url) or "infrastructures" in str(st.session_state.backend_url):
+        st.session_state["backend_url"] = LIVE_RENDER_URL
+    if "api_key" not in st.session_state:
+        st.session_state["api_key"] = DEFAULT_API_KEY
 
-    col_toggle1, col_toggle2 = st.columns(2)
-    with col_toggle1:
-        if st.button("🌐 Live Render", help="Point to live Render cloud backend", use_container_width=True):
-            st.session_state["backend_api_url_input"] = LIVE_RENDER_URL
-            st.rerun()
-    with col_toggle2:
-        if st.button("💻 Localhost", help="Point to local development server (port 8000)", use_container_width=True):
-            st.session_state["backend_api_url_input"] = "http://localhost:8000"
-            st.rerun()
-
-    backend_url = st.text_input(
-        "Backend API Base URL",
-        key="backend_api_url_input",
-        help="FastAPI instance hosting hybrid retrieval, reranking, and invoice audit endpoints."
-    ).rstrip("/")
-
-    api_key_input = st.text_input(
-        "API Security Key (X-API-Key)",
-        value=DEFAULT_API_KEY,
-        type="password",
-        help="Header key required to authorize requests to /chat and /validate-bill to prevent unauthorized cloud charges."
-    ).strip()
+    backend_url = st.session_state["backend_url"]
+    api_key_input = st.session_state["api_key"]
 
     # Live Health Check
     health_status = check_backend_health(backend_url)
@@ -800,20 +780,16 @@ with st.sidebar:
             unsafe_allow_html=True
         )
         data = health_status.get("data", {})
-        st.caption(f"Status: `{data.get('status', 'healthy')}` | Statutory Index: `{data.get('index_loaded', True)}`")
-        if "faiss_vectors" in data:
-            st.caption(f"Vectors: `{data.get('faiss_vectors')}` | Keyword Chunks: `{data.get('bm25_chunks')}`")
+        total_chunks = data.get("total_chunks", 918)
+        st.caption(f"Status: `{data.get('status', 'healthy')}` | Statutory Provisions: `{total_chunks}`")
     else:
         st.markdown(
             '<div style="margin-bottom:10px;"><span class="status-dot status-dot-off"></span>'
-            '<span style="color:#F87171;font-weight:700;font-size:0.88rem;font-family:Inter,sans-serif;">BACKEND OFFLINE</span></div>',
+            '<span style="color:#F87171;font-weight:700;font-size:0.88rem;font-family:Inter,sans-serif;">CONNECTING TO SERVICE...</span></div>',
             unsafe_allow_html=True
         )
-        st.caption(f"Notice: {health_status.get('error', 'Cannot connect to backend')}")
-        if "onrender.com" in backend_url:
-            st.warning("Render free tier instances sleep after inactivity and take ~50s to wake up. If this is a new deploy, verify the service is active on Render or toggle to Localhost above.")
-        else:
-            st.info("Start the backend server using:\n`python -m uvicorn main:app --port 8000`")
+        st.caption(f"Notice: {health_status.get('error', 'Connecting...')}")
+        st.caption("Cloud container is initializing. Please wait a moment.")
 
     st.divider()
 
@@ -834,7 +810,26 @@ with st.sidebar:
 
     if st.button("Clear Consultation Record", use_container_width=True):
         st.session_state.messages = []
+        if "last_bill_result" in st.session_state:
+            del st.session_state["last_bill_result"]
         st.rerun()
+
+    # Collapsed Developer Expander (Hidden from normal users)
+    with st.expander("⚙️ Advanced (Developer)", expanded=False):
+        st.caption("Override cloud endpoint for local debugging:")
+        dev_url = st.text_input("Backend API Base URL", value=backend_url, key="dev_backend_url_input").rstrip("/")
+        dev_key = st.text_input("API Security Key", value=api_key_input, type="password", key="dev_key_input").strip()
+        col_dev1, col_dev2 = st.columns(2)
+        with col_dev1:
+            if st.button("Apply", use_container_width=True):
+                st.session_state["backend_url"] = dev_url
+                st.session_state["api_key"] = dev_key
+                st.rerun()
+        with col_dev2:
+            if st.button("Reset Cloud", use_container_width=True):
+                st.session_state["backend_url"] = LIVE_RENDER_URL
+                st.session_state["api_key"] = DEFAULT_API_KEY
+                st.rerun()
 
 
 # -----------------------------------------------------------------------------
@@ -1035,7 +1030,18 @@ with tab_chat:
                             error_detail = response.json().get("detail", error_detail)
                         except Exception:
                             pass
-                        err_msg = f"Service notification (HTTP {response.status_code}): {error_detail}"
+
+                        if response.status_code == 404 and "onrender.com" in backend_url:
+                            err_msg = (
+                                f"**Render Service Not Found (HTTP 404)**: `{backend_url}`\n\n"
+                                "Render's edge router reported `no-server`. This means either:\n"
+                                "1. **URL Subdomain Mismatch**: Your service name on [Render Dashboard](https://dashboard.render.com) might differ (e.g., check the exact Web Service URL under your service settings).\n"
+                                "2. **Build / Deploy In Progress**: The initial Docker build may still be in progress on Render or encountered an error.\n\n"
+                                "💡 **To continue testing right now**: Click **`💻 Localhost`** in the sidebar to use your already active local FastAPI server!"
+                            )
+                        else:
+                            err_msg = f"Service notification (HTTP {response.status_code}): {error_detail}"
+
                         st.error(err_msg)
                         st.session_state.messages.append({
                             "role": "assistant",
@@ -1152,7 +1158,13 @@ with tab_invoice:
                             err_text = resp.json().get("detail", err_text)
                         except Exception:
                             pass
-                        st.error(f"Audit failed (HTTP {resp.status_code}): {err_text}")
+                        if resp.status_code == 404 and "onrender.com" in backend_url:
+                            st.error(
+                                f"**Render Service Not Found (HTTP 404)** at `{backend_url}`. "
+                                "Please verify the exact service URL on your [Render Dashboard](https://dashboard.render.com) or click **💻 Localhost** in the sidebar."
+                            )
+                        else:
+                            st.error(f"Audit failed (HTTP {resp.status_code}): {err_text}")
 
                 except requests.exceptions.ConnectionError:
                     st.error(f"Unable to reach the backend at `{backend_url}`.")
