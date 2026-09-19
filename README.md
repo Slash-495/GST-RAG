@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚖️ Roznamcha (रोज़नामचा)
+# ⚖️ Chambers & Infrastructure
 ### *GST Legal Intelligence & Automated Invoice Audit*
 
 <p align="center">
@@ -20,7 +20,7 @@
 ---
 
 <!-- HERO BANNER PLACEHOLDER -->
-<img src="https://raw.githubusercontent.com/placeholder/Roznamcha/main/docs/images/hero_banner.png" alt="Roznamcha Hero Banner" width="100%" onerror="this.src='https://via.placeholder.com/1200x400/271c19/FAF7F2?text=%E2%9A%96%EF%B8%8F+Roznamcha+%E2%80%94+GST+Statutory+Counsel+%26+Invoice+Audit';">
+<img src="https://raw.githubusercontent.com/placeholder/chambers-and-infrastructure/main/docs/images/hero_banner.png" alt="Chambers & Infrastructure Hero Banner" width="100%" onerror="this.src='https://via.placeholder.com/1200x400/271c19/FAF7F2?text=%E2%9A%96%EF%B8%8F+Chambers+%26+Infrastructure+%E2%80%94+GST+Statutory+Counsel+%26+Invoice+Audit';">
 
 <br/><br/>
 
@@ -39,7 +39,7 @@
 
 ## 📖 Overview
 
-**Roznamcha** (named after the traditional legal day-book / dispatch ledger) is an enterprise-grade Legal Artificial Intelligence system engineered to demystify the complexities of India's Goods and Services Tax (CGST, IGST, UTGST, and SGST Acts & Rules).
+**Chambers & Infrastructure** is an enterprise-grade Legal Artificial Intelligence system engineered to demystify the complexities of India's Goods and Services Tax (CGST, IGST, UTGST, and SGST Acts & Rules).
 
 It pairs **Hybrid Dense-Sparse RAG** with **Computer Vision Document Intelligence** to solve two major enterprise tax compliance hurdles:
 1. **Statutory Interpretability**: Answering complex legal tax queries in plain language with exact section, sub-section, rule, chapter, and page-level citations from official legislative gazettes.
@@ -177,27 +177,27 @@ The backend is fully containerized, optimized with layer caching, non-root user 
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/Roznamcha.git
-cd Roznamcha
+git clone https://github.com/your-username/chambers-and-infrastructure.git
+cd chambers-and-infrastructure
 
 # 2. Configure your environment file
 cp .env.example .env
 # Edit .env with your respective API keys
 
 # 3. Build the production Docker image
-docker build -t roznamcha-backend:latest .
+docker build -t chambers-infrastructure-api:latest .
 
 # 4. Run the container (Mounting your data directory as read-only)
 docker run -d \
-  --name roznamcha-api \
+  --name chambers-infrastructure-api \
   --restart unless-stopped \
   -p 8000:8000 \
   --env-file .env \
   -v $(pwd)/data:/app/data:ro \
-  roznamcha-backend:latest
+  chambers-infrastructure-api:latest
 
 # 5. Check container logs and health probe
-docker logs -f roznamcha-api
+docker logs -f chambers-infrastructure-api
 curl http://localhost:8000/health
 ```
 
@@ -207,8 +207,8 @@ curl http://localhost:8000/health
 
 ```bash
 # 1. Clone and navigate to project root
-git clone https://github.com/your-username/Roznamcha.git
-cd Roznamcha
+git clone https://github.com/your-username/chambers-and-infrastructure.git
+cd chambers-and-infrastructure
 
 # 2. Create and activate a virtual environment
 python -m venv .venv
