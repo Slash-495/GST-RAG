@@ -390,13 +390,13 @@ Submits a plain-language GST question for hybrid retrieval, reranking, and citat
 
 **Headers:**
 - `Content-Type: application/json`
-- `X-API-Key: chambers-gst-sec-key-2026` *(or configured `API_SECURITY_KEY`)*
+- `X-API-Key: <your-api-key>` *(configured via `API_SECURITY_KEY` in `.env`)*
 
 **Request Example:**
 ```bash
 curl -X POST http://localhost:8000/chat \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: chambers-gst-sec-key-2026" \
+  -H "X-API-Key: <your-api-key>" \
   -d '{"query": "What motor vehicles are blocked from claiming input tax credit under Section 17?"}'
 ```
 
@@ -425,12 +425,12 @@ curl -X POST http://localhost:8000/chat \
 Uploads a tax invoice (PDF or image) for S3 staging, AWS Textract parsing, and tax rate extraction. Protected by `X-API-Key` header authentication to protect AWS billing.
 
 **Headers:**
-- `X-API-Key: chambers-gst-sec-key-2026` *(or configured `API_SECURITY_KEY`)*
+- `X-API-Key: <your-api-key>` *(configured via `API_SECURITY_KEY` in `.env`)*
 
 **Request Example:**
 ```bash
 curl -X POST http://localhost:8000/validate-bill \
-  -H "X-API-Key: chambers-gst-sec-key-2026" \
+  -H "X-API-Key: <your-api-key>" \
   -F "file=@sample_invoice.pdf"
 ```
 
