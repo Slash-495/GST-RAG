@@ -23,6 +23,11 @@ import numpy as np
 from tqdm import tqdm
 from dotenv import load_dotenv
 
+try:
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+except ImportError:
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -117,9 +122,19 @@ class LegalSectionChunker:
         'under ', 'as ', 'the ', 'that ', 'from ', 'where ', 'if ', 'such '
     )
 
-    def __init__(self, max_chunk_chars: int = 2500, chunk_overlap_chars: int = 300):
+    def __init__(self, max_chunk_chars: int = 2500, chunk_overlap_chars: Optional[int] = None):
         self.max_chunk_chars = max_chunk_chars
-        self.chunk_overlap_chars = chunk_overlap_chars
+        # Set chunk overlap to approximately 15-20% of target chunk size (default ~18% = 450 chars)
+        self.chunk_overlap_chars = chunk_overlap_chars if chunk_overlap_chars is not None else int(max_chunk_chars * 0.18)
+
+        # Legal structural text splitter prioritizing statutory boundaries:
+        # ["\nCHAPTER", "\nSection", "\n(", "\n", ". ", " "]
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.max_chunk_chars,
+            chunk_overlap=self.chunk_overlap_chars,
+            length_function=len,
+            separators=["\nCHAPTER", "\nSection", "\n(", "\n", ". ", " "]
+        )
 
     def parse_document(self, pages_data: List[Dict[str, Any]], source_filename: str) -> List[Dict[str, Any]]:
         """
@@ -336,9 +351,10 @@ class LegalSectionChunker:
 
     def _subdivide_large_sections(self, sections: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        If a section is larger than max_chunk_chars, intelligently subdivide it
-        by sub-sections e.g. (1), (2), (3) or paragraphs, while prepending the parent
-        legal section header to ensure retrieval context is retained.
+        If a section is larger than max_chunk_chars (e.g., Section 17(5) continuous blocked credits list),
+        subdivides it using the legal structural splitter with 15-20% overlap prioritizing clause boundaries:
+        ["\nCHAPTER", "\nSection", "\n(", "\n", ". ", " "].
+        Prepends the parent statutory section header to every subchunk to guarantee unbroken legal traceability.
         """
         final_chunks: List[Dict[str, Any]] = []
 
@@ -358,20 +374,8 @@ class LegalSectionChunker:
                     "is_subchunk": False
                 })
             else:
-                # Subdivide by legal subsections e.g. "(1)", "(2)", or newlines
-                paragraphs = re.split(r'\n(?=\s*\(\d+\)|\s*\([a-z]\)|\s*\n)', text)
-                sub_blocks = []
-                current_block = ""
-
-                for p in paragraphs:
-                    if len(current_block) + len(p) < self.max_chunk_chars:
-                        current_block += ("\n" + p if current_block else p)
-                    else:
-                        if current_block:
-                            sub_blocks.append(current_block)
-                        current_block = p
-                if current_block:
-                    sub_blocks.append(current_block)
+                # Subdivide using legal structural text splitter with 15-20% overlap
+                sub_blocks = self.text_splitter.split_text(text)
 
                 for idx, block in enumerate(sub_blocks):
                     chunk_header = f"{header} (Part {idx + 1}/{len(sub_blocks)})"

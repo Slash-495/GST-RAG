@@ -72,5 +72,67 @@ ACTIVITIES TO BE TREATED AS SUPPLY EVEN IF MADE WITHOUT CONSIDERATION
         if pdf_path.exists():
             pdf_path.unlink()
 
+
+def test_continuous_statutory_list_section_17_5():
+    """
+    Test that continuous legal lists (such as Section 17(5) blocked credits)
+    split cleanly along statutory clause boundaries ['\nCHAPTER', '\nSection', '\n(', '\n', '. ', ' ']
+    with 15-20% boundary overlap without orphaning clauses.
+    """
+    section_17_text = """17. Apportionment of credit and blocked credits.-
+(1) Where the goods or services or both are used by the registered person partly for the purpose of any business and partly for other purposes, the amount of credit shall be restricted to so much of the input tax as is attributable to the purposes of his business.
+(2) Where the goods or services or both are used by the registered person partly for effecting taxable supplies including zero-rated supplies and partly for effecting exempt supplies, the amount of credit shall be restricted.
+(5) Notwithstanding anything contained in sub-section (1) of section 16 and subsection (1) of section 18, input tax credit shall not be available in respect of the following, namely:-
+(a) motor vehicles for transportation of persons having approved seating capacity of not more than thirteen persons (including the driver), except when they are used for making taxable supplies;
+(aa) vessels and aircraft except when they are used for making taxable supplies of such vessels or aircraft;
+(ab) services of general insurance, servicing, repair and maintenance in so far as they relate to motor vehicles, vessels or aircraft referred to in clause (a) or clause (aa);
+(b) the following supply of goods or services or both-
+(i) food and beverages, outdoor catering, beauty treatment, health services, cosmetic and plastic surgery;
+(ii) membership of a club, health and fitness centre;
+(iii) travel benefits extended to employees on vacation such as leave or home travel concession;
+(c) works contract services when supplied for construction of an immovable property (other than plant and machinery);
+(d) goods or services or both received by a taxable person for construction of an immovable property on his own account;
+(e) goods or services or both on which tax has been paid under section 10;
+(f) goods or services or both received by a non-resident taxable person, except on goods imported by him;
+(g) goods or services or both used for personal consumption;
+(h) goods lost, stolen, destroyed, written off or disposed of by way of gift or free samples; and
+(i) any tax paid in accordance with the provisions of sections 74, 129 and 130.
+"""
+    # Use max_chunk_chars=500 to force subdivision into multiple chunks
+    chunker = LegalSectionChunker(max_chunk_chars=500)
+    assert 75 <= chunker.chunk_overlap_chars <= 100, f"Overlap should be 15-20%: got {chunker.chunk_overlap_chars}"
+
+    sections = [{
+        "source": "CGST_Act_2017.pdf",
+        "chapter": "CHAPTER V: INPUT TAX CREDIT",
+        "section": "Section 17",
+        "title": "Apportionment of credit and blocked credits",
+        "pages": [41, 42, 43],
+        "text": section_17_text
+    }]
+
+    chunks = chunker._subdivide_large_sections(sections)
+    print(f"\nSubdivided Section 17 into {len(chunks)} sub-chunks.")
+    assert len(chunks) > 1, "Should have subdivided into multiple sub-chunks"
+
+    for i, c in enumerate(chunks):
+        content = c["content"]
+        raw = c["raw_text"]
+        print(f"  Chunk {i+1} length: {len(raw)} chars")
+        # Every chunk must preserve the statutory section header
+        assert "[CGST_Act_2017.pdf | CHAPTER V: INPUT TAX CREDIT | Section 17: Apportionment of credit and blocked credits]" in content
+        assert c["is_subchunk"] is True
+        assert c["part"] == i + 1
+
+    # Verify that clauses start cleanly with '(' and are not split mid-word
+    for c in chunks[1:]:
+        first_line = c["raw_text"].strip().splitlines()[0]
+        # Should start with a legal clause boundary e.g. (a), (b), (i), (c)
+        assert first_line.startswith("(") or first_line.startswith("17") or any(first_line.startswith(x) for x in ["(1)", "(2)", "(5)", "(a)", "(b)", "(c)", "(d)", "(e)"]), f"Clause boundary failed: {first_line}"
+
+    print("Section 17(5) continuous statutory list chunking test passed successfully!")
+
+
 if __name__ == "__main__":
     test_chunker_with_sample_pdf()
+    test_continuous_statutory_list_section_17_5()

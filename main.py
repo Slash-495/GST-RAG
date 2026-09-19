@@ -3,8 +3,8 @@ Production FastAPI Backend for GST Legal Intelligence
 ------------------------------------------------------
 Serves:
   - Startup lifecycle: Loads FAISS index & builds in-memory BM25Okapi keyword index
-  - Hybrid Search: Top 10 FAISS + Top 10 BM25, deduplicated
-  - Reranking: Cohere Rerank API (top 4 chunks) with fallback
+  - Hybrid Search: Top 15 FAISS + Top 15 BM25, deduplicated
+  - Reranking: Cohere Rerank API (top 6 chunks) with fallback
   - Generation: Gemini LLM plain-language generation with specific GST section citations
 """
 
@@ -300,7 +300,7 @@ def run_hybrid_search(query: str, app: FastAPI) -> List[Document]:
     bm25_index = app.state.bm25_index
     chunks = app.state.chunks
 
-    # 1. FAISS Dense Retrieval (Top 10)
+    # 1. FAISS Dense Retrieval (Top 15)
     faiss_docs: List[Document] = []
     try:
         res = genai.embed_content(
@@ -311,7 +311,7 @@ def run_hybrid_search(query: str, app: FastAPI) -> List[Document]:
         q_vec = np.array([res["embedding"]], dtype=np.float32)
         faiss.normalize_L2(q_vec)
 
-        scores, faiss_indices = faiss_index.search(q_vec, 10)
+        scores, faiss_indices = faiss_index.search(q_vec, 15)
         for rank, (score, idx) in enumerate(zip(scores[0], faiss_indices[0])):
             if 0 <= idx < len(chunks):
                 c = chunks[idx]
@@ -335,8 +335,8 @@ def run_hybrid_search(query: str, app: FastAPI) -> List[Document]:
             "Proceeding with BM25 sparse keyword retrieval."
         )
 
-    # 2. BM25 Sparse Retrieval (Top 10, or Top 20 if FAISS unavailable)
-    top_k_bm25 = 10 if faiss_docs else 20
+    # 2. BM25 Sparse Retrieval (Top 15, or Top 30 if FAISS unavailable)
+    top_k_bm25 = 15 if faiss_docs else 30
     query_tokens = tokenize(query)
     bm25_scores = bm25_index.get_scores(query_tokens)
     top_bm25_indices = np.argsort(bm25_scores)[::-1][:top_k_bm25]
@@ -390,7 +390,7 @@ def run_hybrid_search(query: str, app: FastAPI) -> List[Document]:
 def rerank_top_chunks(
     query: str,
     candidate_docs: List[Document],
-    top_n: int = 4
+    top_n: int = 6
 ) -> tuple[List[Document], str]:
     """
     Reranks candidate chunks using the Cohere Rerank API.
@@ -541,15 +541,15 @@ async def chat(request: ChatRequest):
             rerank_engine="none"
         )
 
-    # 3. Cohere Rerank to extract top 4 chunks
-    top_4_docs, rerank_engine = rerank_top_chunks(request.query, candidate_docs, top_n=4)
+    # 3. Cohere Rerank to extract top 6 chunks
+    top_6_docs, rerank_engine = rerank_top_chunks(request.query, candidate_docs, top_n=6)
 
     # 4. Prepare Context & Citations
     context_blocks = []
     citations: List[Citation] = []
     top_chunks_info: List[TopChunk] = []
 
-    for i, doc in enumerate(top_4_docs):
+    for i, doc in enumerate(top_6_docs):
         meta = doc.metadata
         context_blocks.append(
             f"[Provision {i+1}]\n"

@@ -25,15 +25,15 @@ async def test_chat():
         assert len(candidates) > 0, "No candidates retrieved from hybrid search"
 
         # 2. Test Reranking
-        print("\n--- Testing Rerank to Top 4 ---")
-        top_4, engine = main.rerank_top_chunks(query, candidates, top_n=4)
+        print("\n--- Testing Rerank to Top 6 ---")
+        top_6, engine = main.rerank_top_chunks(query, candidates, top_n=6)
         print(f"Rerank engine used: {engine}")
-        print(f"Top 4 chunks selected: {len(top_4)}")
-        for i, doc in enumerate(top_4):
+        print(f"Top 6 chunks selected: {len(top_6)}")
+        for i, doc in enumerate(top_6):
             meta = doc.metadata
             print(f"  [{i+1}] {meta.get('section')} - {meta.get('title')} ({meta.get('source')}, p.{meta.get('pages')})")
 
-        assert len(top_4) <= 4, "Reranking should return at most 4 chunks"
+        assert len(top_6) <= 6, "Reranking should return at most 6 chunks"
 
         # 3. Test Full POST /chat Endpoint (Async)
         print("\n--- Testing Full POST /chat Endpoint ---")
