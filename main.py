@@ -40,7 +40,8 @@ import numpy as np
 import boto3
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, status, File, UploadFile
+from fastapi import FastAPI, HTTPException, status, File, UploadFile, Security, Depends
+from fastapi.security import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from rank_bm25 import BM25Okapi
@@ -77,6 +78,26 @@ AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", "ap-south-1"))
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME", "gst-rag-invoices-slash-020")
 S3_INVOICE_BUCKET = S3_BUCKET_NAME  # Backward-compatible alias
+
+# API Security Key Protection for Costly Endpoints (Textract, Cohere, Gemini)
+API_KEY_NAME = "X-API-Key"
+DEFAULT_API_SECURITY_KEY = "chambers-gst-sec-key-2026"
+API_SECURITY_KEY = os.getenv("API_SECURITY_KEY", os.getenv("X_API_KEY", DEFAULT_API_SECURITY_KEY))
+api_key_header = APIKeyHeader(name=API_KEY_NAME, auto_error=False)
+
+async def verify_api_key(api_key: Optional[str] = Security(api_key_header)):
+    """
+    Guards billing-intensive endpoints (/chat, /validate-bill) against unauthorized requests,
+    DDoS abuse, and surprise cloud billing charges from AWS Textract, Google Gemini, and Cohere.
+    """
+    if not api_key or api_key != API_SECURITY_KEY:
+        logger.warning(f"Unauthorized request rejected: missing or invalid '{API_KEY_NAME}' header.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Unauthorized: Missing or invalid '{API_KEY_NAME}' header. Costly cloud resources are protected.",
+            headers={"WWW-Authenticate": "ApiKey"}
+        )
+    return api_key
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -486,7 +507,7 @@ def health():
     }
 
 
-@app.post("/chat", response_model=ChatResponse, tags=["Chat"])
+@app.post("/chat", response_model=ChatResponse, tags=["Chat"], dependencies=[Depends(verify_api_key)])
 async def chat(request: ChatRequest):
     """
     POST /chat Endpoint
@@ -878,7 +899,7 @@ def extract_tax_rates_summary(
 # ---------------------------------------------------------------------------
 # POST /validate-bill Endpoint
 # ---------------------------------------------------------------------------
-@app.post("/validate-bill", response_model=ValidateBillResponse, tags=["Invoice Validation"])
+@app.post("/validate-bill", response_model=ValidateBillResponse, tags=["Invoice Validation"], dependencies=[Depends(verify_api_key)])
 async def validate_bill(file: UploadFile = File(...)):
     """
     POST /validate-bill Endpoint

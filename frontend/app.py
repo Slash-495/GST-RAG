@@ -32,8 +32,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Backend API Configuration
 DEFAULT_BACKEND_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
+DEFAULT_API_KEY = os.getenv("API_SECURITY_KEY", os.getenv("X_API_KEY", "chambers-gst-sec-key-2026"))
 
 # -----------------------------------------------------------------------------
 # Custom CSS: High-Contrast, Professional Earthy Legal Theme
@@ -762,6 +762,13 @@ with st.sidebar:
         help="FastAPI instance hosting hybrid retrieval, reranking, and invoice audit endpoints."
     ).rstrip("/")
 
+    api_key_input = st.text_input(
+        "API Security Key (X-API-Key)",
+        value=DEFAULT_API_KEY,
+        type="password",
+        help="Header key required to authorize requests to /chat and /validate-bill to prevent unauthorized cloud charges."
+    ).strip()
+
     # Live Health Check
     health_status = check_backend_health(backend_url)
     if health_status["online"]:
@@ -939,10 +946,14 @@ with tab_chat:
             with st.spinner("Conducting statutory hybrid retrieval & legal synthesis..."):
                 try:
                     payload = {"query": active_prompt}
+                    chat_headers = {
+                        "Content-Type": "application/json",
+                        "X-API-Key": api_key_input
+                    }
                     response = requests.post(
                         f"{backend_url}/chat",
                         json=payload,
-                        headers={"Content-Type": "application/json"},
+                        headers=chat_headers,
                         timeout=90
                     )
 
@@ -1093,6 +1104,7 @@ with tab_invoice:
                     resp = requests.post(
                         f"{backend_url}/validate-bill",
                         files=files,
+                        headers={"X-API-Key": api_key_input},
                         timeout=120
                     )
                     latency = time.time() - t0
@@ -1276,9 +1288,10 @@ with tab_architecture:
     )
     with st.expander("🔍 View Core Logic — Client Upload"):
         st.code(
-            """# Streamlit captures binary upload and dispatches multipart request
+            """# Streamlit captures binary upload and dispatches authenticated multipart request
+headers = {"X-API-Key": api_key}
 files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-response = requests.post(f"{backend_url}/validate-bill", files=files, timeout=120)
+response = requests.post(f"{backend_url}/validate-bill", files=files, headers=headers, timeout=120)
 bill_data = response.json()
 return bill_data""",
             language="python"
