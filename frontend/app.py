@@ -970,12 +970,26 @@ with tab_chat:
                         "Content-Type": "application/json",
                         "X-API-Key": api_key_input
                     }
-                    response = requests.post(
-                        f"{backend_url}/chat",
-                        json=payload,
-                        headers=chat_headers,
-                        timeout=90
-                    )
+                    # Cold start resiliency: retry if Render returns 502/503/504 while waking up
+                    response = None
+                    max_retries = 2
+                    for attempt in range(max_retries + 1):
+                        try:
+                            response = requests.post(
+                                f"{backend_url}/chat",
+                                json=payload,
+                                headers=chat_headers,
+                                timeout=90
+                            )
+                            if response.status_code not in [502, 503, 504]:
+                                break
+                            if attempt < max_retries:
+                                time.sleep(3)
+                        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                            if attempt < max_retries:
+                                time.sleep(3)
+                            else:
+                                raise
 
                     if response.status_code == 200:
                         data = response.json()
@@ -1025,22 +1039,31 @@ with tab_chat:
                         })
 
                     else:
-                        error_detail = response.text
+                        error_detail = ""
                         try:
-                            error_detail = response.json().get("detail", error_detail)
+                            error_detail = response.json().get("detail", "")
                         except Exception:
                             pass
 
-                        if response.status_code == 404 and "onrender.com" in backend_url:
+                        if response.status_code in [502, 503, 504]:
+                            err_msg = (
+                                f"**Cloud Service Warming Up (HTTP {response.status_code})**: "
+                                "The Render instance was asleep and is now initializing. "
+                                "Now that it has received traffic, it is ready. **Please submit your question again!**"
+                            )
+                        elif response.status_code == 404 and "onrender.com" in backend_url:
                             err_msg = (
                                 f"**Render Service Not Found (HTTP 404)**: `{backend_url}`\n\n"
-                                "Render's edge router reported `no-server`. This means either:\n"
-                                "1. **URL Subdomain Mismatch**: Your service name on [Render Dashboard](https://dashboard.render.com) might differ (e.g., check the exact Web Service URL under your service settings).\n"
-                                "2. **Build / Deploy In Progress**: The initial Docker build may still be in progress on Render or encountered an error.\n\n"
-                                "💡 **To continue testing right now**: Click **`💻 Localhost`** in the sidebar to use your already active local FastAPI server!"
+                                "Render's edge router reported `no-server`. Check your Render dashboard to verify your Web Service URL."
+                            )
+                        elif response.text.strip().startswith("<!DOCTYPE") or response.text.strip().startswith("<html"):
+                            err_msg = (
+                                f"**Gateway Error (HTTP {response.status_code})**: "
+                                "The remote server is momentarily busy. Please try your question again in a few moments."
                             )
                         else:
-                            err_msg = f"Service notification (HTTP {response.status_code}): {error_detail}"
+                            detail_str = error_detail if error_detail else response.text[:200]
+                            err_msg = f"Service notification (HTTP {response.status_code}): {detail_str}"
 
                         st.error(err_msg)
                         st.session_state.messages.append({
@@ -1139,12 +1162,26 @@ with tab_invoice:
                     }
 
                     t0 = time.time()
-                    resp = requests.post(
-                        f"{backend_url}/validate-bill",
-                        files=files,
-                        headers={"X-API-Key": api_key_input},
-                        timeout=120
-                    )
+                    resp = None
+                    max_retries = 2
+                    for attempt in range(max_retries + 1):
+                        try:
+                            resp = requests.post(
+                                f"{backend_url}/validate-bill",
+                                files=files,
+                                headers={"X-API-Key": api_key_input},
+                                timeout=120
+                            )
+                            if resp.status_code not in [502, 503, 504]:
+                                break
+                            if attempt < max_retries:
+                                time.sleep(3)
+                        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+                            if attempt < max_retries:
+                                time.sleep(3)
+                            else:
+                                raise
+
                     latency = time.time() - t0
 
                     if resp.status_code == 200:
@@ -1153,18 +1190,27 @@ with tab_invoice:
                         st.session_state["last_bill_latency"] = latency
                         st.success(f"Audit completed successfully in {latency:.2f} seconds.")
                     else:
-                        err_text = resp.text
+                        err_text = ""
                         try:
-                            err_text = resp.json().get("detail", err_text)
+                            err_text = resp.json().get("detail", "")
                         except Exception:
                             pass
-                        if resp.status_code == 404 and "onrender.com" in backend_url:
+
+                        if resp.status_code in [502, 503, 504]:
+                            st.error(
+                                f"**Cloud Instance Warming Up (HTTP {resp.status_code})**: "
+                                "The Render container was asleep and is initializing. Please click Execute Document Audit again."
+                            )
+                        elif resp.status_code == 404 and "onrender.com" in backend_url:
                             st.error(
                                 f"**Render Service Not Found (HTTP 404)** at `{backend_url}`. "
-                                "Please verify the exact service URL on your [Render Dashboard](https://dashboard.render.com) or click **💻 Localhost** in the sidebar."
+                                "Please verify the exact service URL on your [Render Dashboard](https://dashboard.render.com)."
                             )
+                        elif resp.text.strip().startswith("<!DOCTYPE") or resp.text.strip().startswith("<html"):
+                            st.error(f"**Gateway Error (HTTP {resp.status_code})**: Service temporarily busy. Please retry in a few moments.")
                         else:
-                            st.error(f"Audit failed (HTTP {resp.status_code}): {err_text}")
+                            detail_str = err_text if err_text else resp.text[:200]
+                            st.error(f"Audit failed (HTTP {resp.status_code}): {detail_str}")
 
                 except requests.exceptions.ConnectionError:
                     st.error(f"Unable to reach the backend at `{backend_url}`.")
