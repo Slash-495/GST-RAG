@@ -16,6 +16,14 @@
 [![Google Gemini](https://img.shields.io/badge/Google-Gemini%20Flash-8E75C2.svg?logo=google&logoColor=white)](https://ai.google.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-Audit%20Ledger-3ECF8E.svg?logo=supabase&logoColor=white)](https://supabase.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Live Application](https://img.shields.io/badge/Streamlit%20Cloud-Live%20App-FF4B4B.svg?style=for-the-badge&logo=streamlit&logoColor=white)](https://chambersandinfastructures.streamlit.app/)
+[![Live Backend](https://img.shields.io/badge/Render-Backend%20API-46E3B7.svg?style=for-the-badge&logo=render&logoColor=black)](https://chambersandinfastructures.onrender.com/health)
+
+<p align="center">
+  <a href="https://chambersandinfastructures.streamlit.app/" target="_blank">
+    <img src="https://img.shields.io/badge/🌐%20Launch%20Live%20Application-chambersandinfastructures.streamlit.app-271C19?style=for-the-badge&logo=streamlit&logoColor=white" alt="Live Web App"/>
+  </a>
+</p>
 
 ---
 
@@ -28,6 +36,7 @@
 
 <br/>
 
+[🚀 Live Web Demo](https://chambersandinfastructures.streamlit.app/) •
 [The Problem](#-the-problem-we-solve) •
 [The Solution](#-the-solution-chambers--infrastructure) •
 [5-Stage Architecture & Core Logic](#-5-stage-system-architecture--processing-pipeline) •
@@ -365,10 +374,12 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 streamlit run frontend/app.py
 ```
 
-Access points:
-- **Streamlit Web UI**: [http://localhost:8501](http://localhost:8501)
-- **FastAPI OpenAPI Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **API Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+Access Points:
+- **🌐 Live Streamlit Application**: [https://chambersandinfastructures.streamlit.app/](https://chambersandinfastructures.streamlit.app/)
+- **⚡ Live FastAPI Health Check (Render)**: [https://chambersandinfastructures.onrender.com/health](https://chambersandinfastructures.onrender.com/health)
+- **📖 Live OpenAPI Documentation**: [https://chambersandinfastructures.onrender.com/docs](https://chambersandinfastructures.onrender.com/docs)
+- **💻 Local Streamlit UI**: [http://localhost:8501](http://localhost:8501)
+- **💻 Local FastAPI OpenAPI Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
 ---
 
