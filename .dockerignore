@@ -18,10 +18,8 @@ venv.bak/
 
 # Data directory (Vectorstore, raw documents, and metadata)
 # Note: Mount data/ at runtime as a volume (-v $(pwd)/data:/app/data:ro)
-data
-data/
-**/data/**
-
+data/*
+!data/vectorstore/
 # Git repository and version control
 .git
 .git/
