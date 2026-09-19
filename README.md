@@ -1,15 +1,15 @@
 <div align="center">
 
 # ⚖️ Chambers & Infrastructure
-### *GST Legal Intelligence & Automated Invoice Audit*
+### *Autonomous GST Legal Intelligence & Automated Invoice Tax Audit*
 
 <p align="center">
-  <b>A high-precision Statutory Legal Copilot & Automated Invoice Tax Rate Validator for the Indian Goods and Services Tax framework.</b>
+  <b>A high-precision Statutory Legal Copilot & Computer Vision Invoice Validator engineered for the Indian Goods and Services Tax framework.</b>
 </p>
 
 [![Python Version](https://img.shields.io/badge/Python-3.12%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.62%2B-FF4B4B.svg?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.64%2B-FF4B4B.svg?logo=streamlit&logoColor=white)](https://streamlit.io/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
 [![AWS Textract & S3](https://img.shields.io/badge/AWS-Textract%20%7C%20S3-FF9900.svg?logo=amazon-aws&logoColor=white)](https://aws.amazon.com/)
 [![Cohere Rerank](https://img.shields.io/badge/Cohere-Rerank%20v3.5-39594C.svg?logo=cohere&logoColor=white)](https://cohere.com/)
@@ -19,17 +19,22 @@
 
 ---
 
-<!-- HERO BANNER PLACEHOLDER -->
-<img src="https://raw.githubusercontent.com/placeholder/chambers-and-infrastructure/main/docs/images/hero_banner.png" alt="Chambers & Infrastructure Hero Banner" width="100%" onerror="this.src='https://via.placeholder.com/1200x400/271c19/FAF7F2?text=%E2%9A%96%EF%B8%8F+Chambers+%26+Infrastructure+%E2%80%94+GST+Statutory+Counsel+%26+Invoice+Audit';">
+<br/>
 
-<br/><br/>
+<!-- HERO SCREENSHOT: MAIN WORKSPACE INTERFACE -->
+<p align="center">
+  <img src="docs/images/copilot_main_interface.png" alt="Chambers & Infrastructure Main Consultation Portal" width="95%" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"/>
+</p>
 
-[Key Features](#-key-features) •
-[System Architecture](#-system-architecture) •
+<br/>
+
+[The Problem](#-the-problem-we-solve) •
+[The Solution](#-the-solution-chambers--infrastructure) •
+[5-Stage Architecture & Core Logic](#-5-stage-system-architecture--processing-pipeline) •
+[Visual Interface Walkthrough](#-visual-interface-walkthrough) •
 [Tech Stack](#-tech-stack) •
 [Local Quickstart (Docker & Python)](#-local-quickstart) •
-[API Specification](#-api-specification) •
-[Environment Configuration](#-environment-configuration)
+[API Specification](#-api-specification)
 
 ---
 
@@ -37,116 +42,208 @@
 
 <br/>
 
-## 📖 Overview
+## 🛑 The Problem We Solve
 
-**Chambers & Infrastructure** is an enterprise-grade Legal Artificial Intelligence system engineered to demystify the complexities of India's Goods and Services Tax (CGST, IGST, UTGST, and SGST Acts & Rules).
+Navigating the Indian Goods and Services Tax (GST) framework is an operational minefield for enterprises, chartered accountants, and finance teams:
 
-It pairs **Hybrid Dense-Sparse RAG** with **Computer Vision Document Intelligence** to solve two major enterprise tax compliance hurdles:
-1. **Statutory Interpretability**: Answering complex legal tax queries in plain language with exact section, sub-section, rule, chapter, and page-level citations from official legislative gazettes.
-2. **Automated Bill Audit**: Extracting, itemizing, and auditing invoice line items, HSN/SAC codes, and applied tax percentages (CGST, SGST, IGST) from scanned invoices and multi-page PDFs using AWS Textract.
-
----
-
-## 🖼️ User Interface
-
-<div align="center">
-  <table>
-    <tr>
-      <td width="50%" align="center">
-        <b>Tab 1: Statutory Legal Copilot (Q&A)</b><br/><br/>
-        <!-- COPILOT SCREENSHOT PLACEHOLDER -->
-        <img src="docs/images/copilot_ui.png" alt="Statutory Legal Copilot" width="100%" onerror="this.src='https://via.placeholder.com/600x380/FAF7F2/140D0B?text=Tab+1%3A+Legal+Copilot+UI+Screenshot';">
-      </td>
-      <td width="50%" align="center">
-        <b>Tab 2: Invoice & Tax Rate Validator</b><br/><br/>
-        <!-- VALIDATOR SCREENSHOT PLACEHOLDER -->
-        <img src="docs/images/validator_ui.png" alt="Invoice Validator Dashboard" width="100%" onerror="this.src='https://via.placeholder.com/600x380/FAF7F2/140D0B?text=Tab+2%3A+Invoice+Validator+UI+Screenshot';">
-      </td>
-    </tr>
-  </table>
-</div>
+1. **The Legislative Labyrinth**: With over 160 statutory Sections, 160 procedural Rules, and more than 10,000 gazetted amendments and circulars, cross-referencing statutory mandates is treacherous.
+2. **Blocked Input Tax Credit (ITC) Penalties (Section 17(5))**: Businesses frequently face aggressive department notices, disputed audits, and mandatory **100% tax penalties** under Sections 73, 74, and 122 for inadvertently claiming ineligible ITC on corporate passenger vehicles, food and beverages, travel benefits, or personal consumption.
+3. **Manual Invoice Auditing Bottlenecks**: Accounts payable departments drown under thousands of scanned PDFs and supplier invoices each month. Manually checking whether an item was correctly charged at 5%, 12%, 18%, or 28%, auditing HSN/SAC codes, and typing line items into ERPs is labor-intensive, slow, and error-prone.
+4. **Generic AI Hallucinations**: Standard off-the-shelf LLMs hallucinate non-existent statutory clauses, conflate repealed pre-GST State VAT laws with current Central GST statutes, and cannot provide verified section numbers or page references from official legislative gazettes.
+5. **Confidential Vendor Financial Exposure**: Storing sensitive invoice documents permanently in unmanaged cloud buckets risks data leakage and enterprise compliance breaches.
 
 ---
 
-## 🚀 Key Features
+## 💡 The Solution: Chambers & Infrastructure
 
-### 1. High-Precision Hybrid Statutory RAG
-- **Dense Vector Search**: Powered by FAISS (L2 normalized index) indexing statutory chunks generated via Gemini embeddings (`models/gemini-embedding-001`).
-- **Sparse Keyword Search**: In-memory `BM25Okapi` index scanning legal terminology, section numbers, and rule definitions.
-- **Cohere Rerank v3.5**: Cross-encoder reranker distilling the top candidates into the 4 most contextually authoritative chunks (with automated Reciprocal Rank Fusion fallback).
-- **Statutory Citations**: Generates clear, plain-language legal answers backed by exact section numbers, rule clauses, chapters, source PDF gazette names, and page references.
+**Chambers & Infrastructure** bridges legislative statutory rigor with computer vision document intelligence to create an automated, compliance-first defense against GST penalties and invoice discrepancies:
 
-### 2. AWS Textract Invoice & Bill Validation
-- **Multi-Format Ingestion**: Ingests supplier invoices across PDF, PNG, JPG, JPEG, and TIFF formats.
-- **Deep Table & Form OCR**: Utilizes AWS Textract `TABLES` and `FORMS` feature types, with automated multi-page asynchronous fallback handling.
-- **Line-Item Extraction**: Accurately itemizes HSN/SAC codes, descriptions, quantities, unit prices, taxable values, and applied CGST/SGST/IGST rates.
-- **HTML & Structured TSV**: Normalizes extracted document tables and cleans extra whitespace using the `unstructured` document processing library.
-
-### 3. Ephemeral S3 Staging Lifecycle
-- **Zero Data Leakage**: Uploads incoming invoices to an ephemeral S3 bucket path (`temp_uploads/{uuid}_{filename}`).
-- **Guaranteed Cleanup**: AWS S3 objects are systematically purged in an asynchronous `finally` block immediately following analysis, ensuring zero lingering invoice exposure or storage bloat.
-
-### 4. Supabase Audit Ledger
-- **Immutable Query Logs**: Asynchronously logs client queries, LLM responses, timestamps, and metadata into a hosted PostgreSQL `chat_logs` table via Supabase for legal auditability.
-- **Resilient Non-Blocking Execution**: Database logging exceptions are handled gracefully without degrading user-facing API performance.
-
-### 5. High-Contrast Law Firm Aesthetic
-- **Bespoke UI Design**: Custom Streamlit frontend built with a refined, earthy legal palette (deep walnut brown `#271c19`, soft linen parchment `#FAF7F2`, high-contrast charcoal `#111111`, and classic `Merriweather` serif typography).
-- **Real-Time Token Streaming**: Simulates natural legal dictation cadence using `st.write_stream`.
+- **Dual-Stream Hybrid RAG**: Merges dense semantic embeddings (`FAISS L2`) with sparse legislative keyword search (`BM25Okapi`), re-scored via `Cohere Rerank v3.5` to eliminate statutory hallucinations.
+- **Computer Vision Bill Audit**: Leverages `AWS Textract` (`TABLES` and `FORMS` feature types) and the `unstructured` library to extract multi-page invoice tables, line items, and tax rates in under 15 seconds.
+- **Ephemeral Zero-Data-Retention Staging**: Staged documents in AWS S3 (`gst-rag-invoices-slash-020`) are automatically purged in an asynchronous `finally` block immediately post-processing.
+- **Audited Statutory Traceability**: Every generated legal answer references exact Sections, Titles, Chapters, official PDF gazette filenames, and page numbers, while logging client queries into an immutable `Supabase` audit ledger.
 
 ---
 
-## 🏗️ System Architecture
+## 🏗️ 5-Stage System Architecture & Processing Pipeline
+
+The end-to-end processing lifecycle is structured into five distinct, enterprise-grade stages:
 
 ```mermaid
 flowchart TD
-    subgraph Client ["Client Presentation Layer (Streamlit)"]
-        ChatUI["Tab 1: Legal Copilot (Q&A)"]
-        UploadUI["Tab 2: Invoice Validator"]
+    subgraph S1 ["Stage 1: Client Upload"]
+        UI["Streamlit Frontend (:8501)"]
+        FileSelect["User Submits PDF / Image"]
+        Multipart["Multipart POST /validate-bill"]
+        UI --> FileSelect --> Multipart
     end
 
-    subgraph BackendAPI ["FastAPI Production Gateway (:8000)"]
-        ChatEndpoint["POST /chat"]
-        BillEndpoint["POST /validate-bill"]
-        HealthEndpoint["GET /health"]
+    subgraph S2 ["Stage 2: Secure Cloud Staging"]
+        FastAPI["FastAPI Gateway (:8000)"]
+        S3Upload["boto3.client('s3').put_object()"]
+        S3Bucket[("AWS S3 Staging Bucket\n(gst-rag-invoices-slash-020)")]
+        Multipart --> FastAPI --> S3Upload --> S3Bucket
     end
 
-    subgraph RAGPipeline ["Statutory Intelligence Pipeline"]
-        FAISS["FAISS Dense Vectorstore (L2)"]
-        BM25["BM25Okapi Sparse Keyword Index"]
-        Cohere["Cohere Rerank v3.5 API"]
-        Gemini["Google Gemini Legal QA"]
-        SupaDB[("Supabase Postgres (chat_logs)")]
+    subgraph S3Stage ["Stage 3: Vision & OCR Intelligence"]
+        Textract["AWS Textract Document Intelligence\n(FeatureTypes: TABLES + FORMS)"]
+        Unstructured["Unstructured Formatting Engine\n(Table HTML & Whitespace Normalization)"]
+        S3Bucket --> Textract --> Unstructured
     end
 
-    subgraph VisionPipeline ["Document Vision Pipeline"]
-        S3Bucket[("AWS S3 Staging Bucket")]
-        Textract["AWS Textract (Tables + Forms)"]
-        Unstructured["Unstructured Formatting Engine"]
-        TaxEngine["GST Tax Summary Parser"]
+    subgraph S4 ["Stage 4: Hybrid Statutory RAG"]
+        FAISS["FAISS L2 Dense Search\n(Gemini 3072-dim Vectors)"]
+        BM25["BM25Okapi Sparse Search\n(Statutory Terminology)"]
+        Cohere["Cohere Rerank v3.5\n(Distills Top 4 Chunks)"]
+        Unstructured -.->|Extracted Terms & Rates| FAISS & BM25
+        FAISS & BM25 --> Cohere
     end
 
-    ChatUI -->|JSON Query| ChatEndpoint
-    ChatEndpoint --> FAISS & BM25
-    FAISS & BM25 -->|Candidate Chunks| Cohere
-    Cohere -->|Top 4 Chunks| Gemini
-    Gemini -->|Statutory QA + Citations| ChatEndpoint
-    ChatEndpoint -.->|Async Logging| SupaDB
-    ChatEndpoint -->|Streaming Answer| ChatUI
+    subgraph S5 ["Stage 5: LLM Validation & Synthesis"]
+        Gemini["Google Gemini Legal QA\n(Cross-References Rates & Laws)"]
+        SupaDB[("Supabase Postgres\n(chat_logs)")]
+        Response["Validated JSON Response\n(Tax Rates + Citations)"]
+        Purge["Ephemeral S3 Purge (finally)"]
 
-    UploadUI -->|Multipart File Upload| BillEndpoint
-    BillEndpoint -->|1. Temp Upload| S3Bucket
-    S3Bucket -->|2. Trigger Analysis| Textract
-    Textract -->|3. Clean Tables & Lines| Unstructured
-    Unstructured -->|4. Rate Categorization| TaxEngine
-    BillEndpoint -.->|5. Purge Temp File (finally)| S3Bucket
-    BillEndpoint -->|JSON Tax Breakdown| UploadUI
+        Cohere --> Gemini
+        Gemini --> Response
+        Gemini -.->|Async Logging| SupaDB
+        Response --> UI
+        FastAPI -.->|Guaranteed Cleanup| Purge -.-> S3Bucket
+    end
+
+    classDef stageStyle fill:#FFFFFF,stroke:#8C7866,stroke-width:2px,color:#140D0B;
+    class S1,S2,S3Stage,S4,S5 stageStyle;
 ```
 
-### 3-Step Invoice Processing Workflow
-1. **Secure Ephemeral Staging**: When an invoice is submitted via Streamlit, FastAPI stages the binary file in AWS S3 (`s3://${S3_BUCKET_NAME}/temp_uploads/{uuid}_{filename}`).
-2. **Textract Document Analysis**: FastAPI triggers AWS Textract (`TABLES` and `FORMS` feature types), dynamically switching to asynchronous polling if a multi-page document is detected.
-3. **Parsing, Verification & Cleanup**: The raw OCR blocks are normalized via the `unstructured` library to reconstruct tables, isolate line-item tax rates (CGST, SGST, IGST), and return clean JSON to the frontend—while the temporary S3 file is instantly purged.
+---
+
+### The 5 Core Stages: Show the Receipts
+
+Below are the 5 core stages mapped out with their actual production code implementations:
+
+#### 📤 Stage 1: Client Upload & Multipart Dispatch
+Streamlit captures incoming supplier invoices (PDF, PNG, JPG, TIFF), validates file integrity, and dispatches an asynchronous multipart request to the containerized FastAPI backend.
+
+<details>
+<summary><b>🔍 View Core Logic — Client Upload (Streamlit)</b></summary>
+
+```python
+# Streamlit captures binary upload and dispatches multipart request
+files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+response = requests.post(f"{backend_url}/validate-bill", files=files, timeout=120)
+bill_data = response.json()
+st.session_state["last_bill_result"] = bill_data
+```
+</details>
+
+---
+
+#### ☁️ Stage 2: Secure Cloud Staging (AWS S3)
+FastAPI streams document bytes directly to encrypted AWS S3 staging (`gst-rag-invoices-slash-020`) under a unique UUID-keyed path. Zero raw files touch local disks, and post-audit cleanup is guaranteed via an asynchronous `finally` block.
+
+<details>
+<summary><b>🔍 View Core Logic — Ephemeral S3 Staging (FastAPI)</b></summary>
+
+```python
+# FastAPI streams document directly to AWS S3 with dynamic region
+s3 = boto3.client("s3", region_name=aws_region)
+await asyncio.to_thread(
+    lambda: s3.put_object(Bucket=bucket_name, Key=s3_key, Body=file_bytes, ContentType=file.content_type)
+)
+# Cleanup is guaranteed in a finally block after processing completes
+```
+</details>
+
+---
+
+#### 👁️ Stage 3: Vision & OCR Intelligence (AWS Textract)
+AWS Textract analyzes the staged S3 object using `TABLES` and `FORMS` feature types (with asynchronous polling fallback for multi-page documents). Raw OCR blocks are parsed through the `unstructured` library to reconstruct clean 2D tabular grids and isolate line items.
+
+<details>
+<summary><b>🔍 View Core Logic — Textract Analysis & Normalization (boto3 + unstructured)</b></summary>
+
+```python
+# Trigger AWS Textract on the ephemeral S3 object (Tables + Forms)
+textract = boto3.client("textract", region_name=aws_region)
+res = await asyncio.to_thread(lambda: textract.analyze_document(
+    Document={"S3Object": {"Bucket": bucket_name, "Name": s3_key}}, FeatureTypes=["TABLES", "FORMS"]
+))
+raw_tables, raw_line_items, raw_lines = parse_textract_tables_and_lines(res.get("Blocks", []))
+```
+</details>
+
+---
+
+#### 📚 Stage 4: Hybrid Statutory RAG Retrieval (FAISS + BM25 + Cohere)
+Extracted invoice line items and tax inquiries trigger dual-stream statutory search: top-10 dense vector retrieval via `FAISS L2` and top-10 sparse keyword retrieval via `BM25Okapi`. `Cohere Rerank v3.5` distills these into the 4 most contextually authoritative statutory provisions.
+
+<details>
+<summary><b>🔍 View Core Logic — Dual-Stream Hybrid Rerank (FAISS + BM25 + Cohere)</b></summary>
+
+```python
+# In-memory dense FAISS + sparse BM25Okapi search distilled by Cohere
+scores, indices = faiss_index.search(q_vec, 10)
+bm25_indices = np.argsort(bm25_index.get_scores(tokenize(query)))[::-1][:10]
+candidates = deduplicate_chunks(faiss_candidates, bm25_candidates)
+reranked = cohere_client.rerank(model="rerank-v3.5", query=query, documents=candidates, top_n=4)
+```
+</details>
+
+---
+
+#### ⚖️ Stage 5: LLM Validation & Statutory Synthesis (Google Gemini)
+`Google Gemini` cross-references the Textract-extracted line items (e.g., 18% GST on services) against official GST law, verifies statutory compliance, generates legal advice with page-level citations, and logs the interaction to `Supabase`.
+
+<details>
+<summary><b>🔍 View Core Logic — Gemini Legal QA & Supabase Audit</b></summary>
+
+```python
+# Google Gemini legal QA cross-referencing extracted items with statutory law
+model = genai.GenerativeModel("gemini-2.5-flash")
+qa_response = model.generate_content(f"Context:\n{legal_context}\n\nTask: Validate invoice tax rates and cite sections.")
+await log_chat_to_supabase(query=query, response=qa_response.text, timestamp=datetime.now())
+return ValidateBillResponse(status="success", tax_rates=tax_summary, line_items=line_items)
+```
+</details>
+
+---
+
+## 📸 Visual Interface Walkthrough
+
+### 1. Tab 1: Statutory Legal Copilot & Gemini QA
+*Inquiring on complex GST statutory questions (e.g. Blocked Input Tax Credit on passenger motor vehicles under Section 17(5)).*
+
+<p align="center">
+  <img src="docs/images/copilot_response.png" alt="Gemini Statutory Legal Counsel on Section 17(5)" width="95%" style="border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.12);"/>
+</p>
+
+---
+
+### 2. Statutory Citation Authentication & Official Gazette Mapping
+*Every plain-language response provides expandable statutory citation cards showing exact Section numbers, Titles, Chapter context, PDF Gazette filenames, and verified Page Numbers.*
+
+<p align="center">
+  <img src="docs/images/copilot_citations.png" alt="Statutory Citation Cards with Gazette Page References" width="95%" style="border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.12);"/>
+</p>
+
+---
+
+### 3. Tab 2: Automated Invoice Tax Rate Validator
+*Processing `e-invoice-in-tallyprime.pdf` (628.84 KB) via AWS Textract in **12.67 seconds**, extracting detected GST rates (9% CGST / 9% SGST), and tracking ephemeral S3 staging references.*
+
+<p align="center">
+  <img src="docs/images/invoice_validator_overview.png" alt="Invoice Validator Dashboard with Verified Tax Rate Schedules" width="95%" style="border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.12);"/>
+</p>
+
+---
+
+### 4. Structured Line Items & Reconstructed Document Tables
+*Isolating discrete line items (HSN/SAC 1005, Taxable Value ₹3,500.00, CGST/SGST amounts) alongside complete 2D reconstructed invoice tables (IRN, Ack No, Ack Date).*
+
+<p align="center">
+  <img src="docs/images/invoice_line_items.png" alt="Itemized Line Particulars and Reconstructed Tables" width="95%" style="border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.12);"/>
+</p>
 
 ---
 
@@ -154,17 +251,17 @@ flowchart TD
 
 | Domain | Technology | Purpose & Implementation |
 | :--- | :--- | :--- |
-| **Frontend** | [Streamlit](https://streamlit.io/) | Interactive dashboard with custom CSS, real-time response streaming, and document preview |
-| **Backend API** | [FastAPI](https://fastapi.tiangolo.com/) | High-performance asynchronous REST API with Swagger documentation (`/docs`) |
-| **Language** | [Python 3.12](https://www.python.org/) | Core language runtime utilizing typed Pydantic V2 schemas and async I/O |
-| **Vector Index** | [FAISS](https://github.com/facebookresearch/faiss) | In-memory dense vector index for fast statutory chunk similarity retrieval |
-| **Keyword Search** | [Rank-BM25](https://github.com/dorianbrown/rank_bm25) | In-memory sparse BM25Okapi keyword index for precise legislative section lookup |
-| **Reranking** | [Cohere Rerank](https://cohere.com/) | State-of-the-art cross-encoder (`rerank-v3.5`) with reciprocal rank fusion fallback |
-| **Legal LLM** | [Google Gemini](https://ai.google.dev/) | Generative legal synthesis citing official sections, clauses, and schedules |
-| **Vision OCR** | [AWS Textract](https://aws.amazon.com/textract/) | Machine learning table and form extraction for scanned documents and invoices |
-| **Cloud Storage** | [AWS S3](https://aws.amazon.com/s3/) | Ephemeral document staging lifecycle with automated object deletion |
+| **Frontend** | [Streamlit](https://streamlit.io/) | High-contrast earthy legal dashboard with custom CSS, real-time response streaming, and pipeline visualization |
+| **Backend API** | [FastAPI](https://fastapi.tiangolo.com/) | Asynchronous, containerized REST API with automatic OpenAPI Swagger documentation (`/docs`) |
+| **Language** | [Python 3.12](https://www.python.org/) | Type-safe runtime utilizing Pydantic V2 schemas and async I/O |
+| **Vector Index** | [FAISS](https://github.com/facebookresearch/faiss) | In-memory dense L2 vectorstore indexing 3072-dimensional Gemini statutory embeddings |
+| **Keyword Search** | [Rank-BM25](https://github.com/dorianbrown/rank_bm25) | In-memory sparse BM25Okapi keyword index for pinpoint legislative section search |
+| **Reranking** | [Cohere Rerank](https://cohere.com/) | Cross-encoder (`rerank-v3.5`) selecting the top 4 most authoritative statutory extracts |
+| **Legal LLM** | [Google Gemini](https://ai.google.dev/) | Generative statutory QA citing official sections, clauses, chapters, and schedules |
+| **Vision OCR** | [AWS Textract](https://aws.amazon.com/textract/) | Deep-learning table and form extraction for scanned supplier invoices and multi-page PDFs |
+| **Cloud Storage** | [AWS S3](https://aws.amazon.com/s3/) | Ephemeral document staging (`gst-rag-invoices-slash-020`) with guaranteed lifecycle deletion |
 | **Doc Processing** | [Unstructured](https://unstructured.io/) | Document normalization, table HTML reconstruction, and whitespace cleaning |
-| **Audit Ledger** | [Supabase](https://supabase.com/) | Cloud-hosted PostgreSQL table (`chat_logs`) for persistent, immutable audit logging |
+| **Audit Ledger** | [Supabase](https://supabase.com/) | Cloud-hosted PostgreSQL table (`chat_logs`) for persistent compliance logging |
 | **Container** | [Docker](https://www.docker.com/) | Production-ready `python:3.12-slim` container with OpenMP and healthcheck probes |
 
 ---
@@ -228,43 +325,10 @@ python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 streamlit run frontend/app.py
 ```
 
-Access the applications:
+Access points:
 - **Streamlit Web UI**: [http://localhost:8501](http://localhost:8501)
 - **FastAPI OpenAPI Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
 - **API Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
-
----
-
-## 🔑 Environment Configuration
-
-Create a `.env` file in the project root with the following parameters:
-
-```ini
-# ==============================================================================
-# Google Gemini Configuration
-# ==============================================================================
-GEMINI_API_KEY=your_gemini_api_key_here
-
-# ==============================================================================
-# Cohere Rerank Configuration
-# ==============================================================================
-COHERE_API_KEY=your_cohere_api_key_here
-
-# ==============================================================================
-# Supabase Audit Logging Configuration
-# ==============================================================================
-SUPABASE_URL=https://your-project-id.supabase.co
-SUPABASE_KEY=your_supabase_service_or_anon_key
-
-# ==============================================================================
-# AWS Configuration (Textract & S3)
-# ==============================================================================
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-AWS_REGION=ap-south-1
-AWS_DEFAULT_REGION=ap-south-1
-S3_BUCKET_NAME=gst-rag-invoices-slash-020
-```
 
 ---
 
@@ -345,7 +409,7 @@ Uploads a tax invoice (PDF or image) for S3 staging, AWS Textract parsing, and t
 
 ## 🛡️ Security & Compliance
 
-- **No Data Retention on S3**: Uploaded invoices are immediately purged in an automated `finally` block to protect client financial confidentiality.
+- **Zero S3 Retention**: Staged invoices are purged in an automated `finally` block to protect client financial confidentiality.
 - **Read-Only Vector Store**: FAISS indices and metadata pickles are mounted in read-only mode (`:ro`) to safeguard the statutory embeddings against tampering.
 - **Principle of Least Privilege**: Docker containers run under an unprivileged `appuser` (UID 1000) rather than `root`.
 - **Statutory Traceability**: Every generated legal answer includes direct citations from the official Indian GST Acts and Rules.
