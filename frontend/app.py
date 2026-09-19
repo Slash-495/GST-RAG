@@ -47,8 +47,8 @@ DEFAULT_BACKEND_URL = os.getenv("BACKEND_API_URL", "http://localhost:8000")
 # -----------------------------------------------------------------------------
 LEGAL_THEME_CSS = """
 <style>
-/* Google Font Import: Merriweather & Inter */
-@import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+/* Google Font Import: Merriweather, Inter, JetBrains Mono */
+@import url('https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 /* Global Root Variables */
 :root {
@@ -58,9 +58,9 @@ LEGAL_THEME_CSS = """
     --card-bg: #FFFFFF;
     --border-strong: #8C7866;
     --border-subtle: #B8A898;
-    --text-pure-dark: #111111;
-    --text-body: #1A1A1A;
-    --text-muted: #332A26;
+    --text-pure-dark: #140D0B;
+    --text-body: #1E1715;
+    --text-muted: #42352F;
 }
 
 /* Global Canvas Background & High Contrast Defaults */
@@ -71,6 +71,12 @@ LEGAL_THEME_CSS = """
     line-height: 1.65;
 }
 
+/* Main content container */
+.main .block-container {
+    padding-top: 2rem !important;
+    padding-bottom: 3rem !important;
+}
+
 /* Typography - Bold, Deep & High Contrast */
 h1, h2, h3, h4, h5, h6 {
     font-family: 'Merriweather', Georgia, serif !important;
@@ -79,8 +85,20 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: -0.3px;
 }
 
-.stApp p, .stApp span, .stApp label, .stApp div {
-    color: var(--text-body);
+/* Main content body text - scoped exclusively to main application canvas */
+section.main .stMarkdown p,
+section.main .stMarkdown li,
+section.main div[data-testid="stMarkdownContainer"] > p,
+section.main div[data-testid="stMarkdownContainer"] > ul,
+section.main div[data-testid="stMarkdownContainer"] > ol,
+[data-testid="stMain"] .stMarkdown p,
+[data-testid="stMain"] .stMarkdown li,
+[data-testid="stMain"] div[data-testid="stMarkdownContainer"] p,
+[data-testid="stMain"] div[data-testid="stMarkdownContainer"] li {
+    color: #140D0B !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.96rem !important;
+    line-height: 1.65;
 }
 
 .legal-header-title {
@@ -107,64 +125,104 @@ h1, h2, h3, h4, h5, h6 {
     padding: 4px 12px;
     font-family: 'Inter', sans-serif;
     font-size: 0.76rem;
-    font-weight: 700;
+    font-weight: 800;
     letter-spacing: 1px;
     text-transform: uppercase;
-    color: #140D0B;
-    background-color: #E8DEC8;
-    border: 1.5px solid #786555;
+    color: #140D0B !important;
+    background-color: #E8DEC8 !important;
+    border: 1.5px solid #786555 !important;
     border-radius: 4px;
     margin-bottom: 0.5rem;
 }
 
 .legal-badge-gold {
-    color: #140D0B;
-    background-color: #EFE3D0;
-    border-color: #8C7866;
-    font-weight: 700;
-}
-
-/* Sidebar Styling - Deep Walnut Brown with Bright Crisp Text */
-section[data-testid="stSidebar"] {
-    background-color: #1C1311 !important;
-    color: #F5EFEB !important;
-    border-right: 2px solid #3d2d29 !important;
-}
-
-section[data-testid="stSidebar"] h1,
-section[data-testid="stSidebar"] h2,
-section[data-testid="stSidebar"] h3,
-section[data-testid="stSidebar"] h4 {
-    color: #FFFFFF !important;
+    color: #140D0B !important;
+    background-color: #EFE3D0 !important;
+    border-color: #8C7866 !important;
     font-weight: 800 !important;
 }
 
+/* ========================================================================= */
+/* SIDEBAR - DEEP WALNUT BACKGROUND WITH CRISP PURE WHITE & LINEN TEXT       */
+/* ========================================================================= */
+section[data-testid="stSidebar"],
+section[data-testid="stSidebar"] > div {
+    background-color: #1C1311 !important;
+    color: #FFFFFF !important;
+    border-right: 2px solid #3d2d29 !important;
+}
+
+/* Headings in sidebar */
+section[data-testid="stSidebar"] h1,
+section[data-testid="stSidebar"] h2,
+section[data-testid="stSidebar"] h3,
+section[data-testid="stSidebar"] h4,
+section[data-testid="stSidebar"] h5,
+section[data-testid="stSidebar"] h6 {
+    color: #FFFFFF !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.2px !important;
+}
+
+/* All paragraphs, labels, spans, and standard text in sidebar */
 section[data-testid="stSidebar"] p,
 section[data-testid="stSidebar"] span,
-section[data-testid="stSidebar"] div,
-section[data-testid="stSidebar"] label {
-    color: #F0E8DF !important;
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] div {
+    color: #F5EFEB !important;
     font-family: 'Inter', sans-serif !important;
-    font-size: 0.92rem !important;
+    font-size: 0.93rem !important;
 }
 
+/* List items (Statutory Jurisprudence bullets) - 100% VISIBLE & READABLE */
+section[data-testid="stSidebar"] ul,
+section[data-testid="stSidebar"] ol,
+section[data-testid="stSidebar"] li,
+section[data-testid="stSidebar"] .stMarkdown li,
+section[data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] li {
+    color: #F5EFEB !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.93rem !important;
+    line-height: 1.65 !important;
+}
+
+/* Bullet point markers (•) in sidebar */
+section[data-testid="stSidebar"] li::marker {
+    color: #E8DEC8 !important;
+    font-size: 1.1em !important;
+}
+
+/* Strong / Bold labels inside sidebar (e.g. "Dense Index:", "Sparse Index:") */
+section[data-testid="stSidebar"] strong,
+section[data-testid="stSidebar"] b,
+section[data-testid="stSidebar"] .stMarkdown strong {
+    color: #FFFFFF !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.2px !important;
+}
+
+/* Captions and subtext in sidebar */
 section[data-testid="stSidebar"] .stCaption,
-section[data-testid="stSidebar"] .stCaption p {
+section[data-testid="stSidebar"] .stCaption p,
+section[data-testid="stSidebar"] small {
     color: #DDD3C7 !important;
-    font-size: 0.85rem !important;
+    font-size: 0.86rem !important;
 }
 
+/* Badges in sidebar */
 section[data-testid="stSidebar"] .legal-badge {
     background-color: #3b2c28 !important;
     color: #FFFFFF !important;
-    border-color: #6E534A !important;
-    font-weight: 700 !important;
+    border: 1.5px solid #6E534A !important;
+    font-weight: 800 !important;
 }
 
+/* Dividers in sidebar */
 section[data-testid="stSidebar"] hr {
     border-color: #4A3832 !important;
 }
 
+/* Text Input in sidebar */
 section[data-testid="stSidebar"] input {
     background-color: #120C0A !important;
     color: #FFFFFF !important;
@@ -172,23 +230,35 @@ section[data-testid="stSidebar"] input {
     font-weight: 500 !important;
 }
 
-/* Formal Legal Card Container */
-.legal-card {
-    background-color: #FFFFFF;
-    border: 1.5px solid #8C7866;
-    border-left: 6px solid #271c19;
-    border-radius: 6px;
-    padding: 22px;
-    margin-bottom: 20px;
-    box-shadow: 0 3px 10px rgba(39, 28, 25, 0.08);
+/* Inline code tags in sidebar (e.g. `rerank-v3.5`, `chat_logs`, `gst-rag-invoices-slash-020`) */
+section[data-testid="stSidebar"] code {
+    background-color: #382621 !important;
+    color: #FFEAD8 !important;
+    border: 1px solid #78584B !important;
+    border-radius: 4px !important;
+    padding: 2px 7px !important;
+    font-family: 'JetBrains Mono', monospace !important;
+    font-weight: 600 !important;
+    font-size: 0.85em !important;
 }
 
-/* Tabs Styling - Bold and Clear */
+/* Formal Legal Card Container */
+.legal-card {
+    background-color: #FFFFFF !important;
+    border: 1.5px solid #8C7866 !important;
+    border-left: 6px solid #271c19 !important;
+    border-radius: 6px !important;
+    padding: 22px !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 3px 10px rgba(39, 28, 25, 0.08) !important;
+}
+
+/* Tabs Styling - Bold, Clean and High Contrast */
 .stTabs [data-baseweb="tab-list"] {
     gap: 12px;
     background-color: transparent;
     padding: 0;
-    border-bottom: 2px solid #8C7866;
+    border-bottom: 2.5px solid #8C7866;
 }
 
 .stTabs [data-baseweb="tab"] {
@@ -207,14 +277,14 @@ section[data-testid="stSidebar"] input {
 
 .stTabs [data-baseweb="tab"]:hover {
     color: #140D0B !important;
-    background-color: rgba(39, 28, 25, 0.05);
+    background-color: rgba(39, 28, 25, 0.06);
 }
 
 .stTabs [aria-selected="true"] {
     color: #140D0B !important;
     font-weight: 900 !important;
     border-bottom: 4px solid #140D0B !important;
-    background-color: rgba(232, 222, 200, 0.3) !important;
+    background-color: rgba(232, 222, 200, 0.4) !important;
 }
 
 /* Chat Messages */
@@ -246,27 +316,35 @@ section[data-testid="stSidebar"] input {
 }
 
 /* Chat Input Bar */
-.stChatInputContainer {
+div[data-testid="stChatInput"] {
     background-color: #FFFFFF !important;
     border: 2px solid #8C7866 !important;
-    border-radius: 6px !important;
-    box-shadow: 0 3px 8px rgba(39, 28, 25, 0.08) !important;
+    border-radius: 8px !important;
+    box-shadow: 0 3px 10px rgba(39, 28, 25, 0.08) !important;
 }
 
-.stChatInputContainer:focus-within {
+div[data-testid="stChatInput"]:focus-within {
     border: 2px solid #140D0B !important;
-    box-shadow: 0 0 0 2px rgba(20, 13, 11, 0.2) !important;
+    box-shadow: 0 0 0 2px rgba(20, 13, 11, 0.25) !important;
 }
 
-.stChatInputContainer input {
-    color: #111111 !important;
+div[data-testid="stChatInput"] textarea {
+    color: #140D0B !important;
     font-family: 'Inter', sans-serif !important;
+    font-size: 0.95rem !important;
     font-weight: 500 !important;
+    background-color: #FFFFFF !important;
 }
 
-/* ========================================================================= */
-/* BUTTONS - HIGH CONTRAST SOLID WALNUT WITH PURE WHITE TEXT                 */
-/* ========================================================================= */
+div[data-testid="stChatInput"] textarea::placeholder {
+    color: #6E5A4D !important;
+}
+
+div[data-testid="stChatInput"] button svg {
+    fill: #140D0B !important;
+}
+
+/* BUTTONS - HIGH CONTRAST SOLID WALNUT WITH PURE WHITE TEXT */
 .stButton > button {
     background-color: #271c19 !important;
     background: #271c19 !important;
@@ -297,7 +375,6 @@ section[data-testid="stSidebar"] input {
     transform: translateY(0);
 }
 
-/* CRITICAL: Enforce Pure White text on all children of buttons */
 .stButton > button *,
 .stButton > button p,
 .stButton > button div,
@@ -311,37 +388,191 @@ section[data-testid="stSidebar"] input {
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6) !important;
 }
 
-/* Expanders */
+/* ========================================================================= */
+/* EXPANDERS - HIGH-CONTRAST PARCHMENT HEADERS (FIXED CONTRAST BUG)          */
+/* ========================================================================= */
+details[data-testid="stExpander"],
+div[data-testid="stExpander"],
+.streamlit-expanderHeader {
+    background-color: #FFFFFF !important;
+    border: 2px solid #8C7866 !important;
+    border-radius: 6px !important;
+    margin-bottom: 14px !important;
+    box-shadow: 0 2px 6px rgba(39, 28, 25, 0.06) !important;
+    overflow: hidden !important;
+}
+
+/* Expander Header / Summary Bar */
+details[data-testid="stExpander"] > summary,
+div[data-testid="stExpander"] > summary,
 .streamlit-expanderHeader {
     background-color: #EFE6D8 !important;
-    border: 1.5px solid #8C7866 !important;
-    border-radius: 5px !important;
-    color: #140D0B !important;
-    font-family: 'Merriweather', Georgia, serif !important;
-    font-weight: 700 !important;
-    font-size: 1rem !important;
+    background: #EFE6D8 !important;
+    border-bottom: 2px solid transparent !important;
+    border-radius: 4px !important;
+    padding: 12px 18px !important;
+    cursor: pointer !important;
+    transition: background-color 0.2s ease !important;
 }
 
-.streamlit-expanderHeader * {
-    color: #140D0B !important;
-    font-weight: 700 !important;
+details[data-testid="stExpander"][open] > summary,
+div[data-testid="stExpander"][open] > summary {
+    border-bottom: 2px solid #8C7866 !important;
+    border-radius: 4px 4px 0 0 !important;
 }
 
+details[data-testid="stExpander"] > summary:hover,
+div[data-testid="stExpander"] > summary:hover,
 .streamlit-expanderHeader:hover {
-    background-color: #E5D9C7 !important;
+    background-color: #E2D4BF !important;
+    background: #E2D4BF !important;
     border-color: #5C4A3A !important;
 }
 
-.streamlit-expanderContent {
-    background-color: #FFFFFF !important;
-    border: 1.5px solid #8C7866 !important;
-    border-top: none !important;
-    border-radius: 0 0 5px 5px !important;
-    padding: 18px !important;
+/* Force header text to be deep bold walnut brown with 100% contrast */
+details[data-testid="stExpander"] > summary *,
+details[data-testid="stExpander"] > summary p,
+details[data-testid="stExpander"] > summary span,
+details[data-testid="stExpander"] > summary div,
+div[data-testid="stExpander"] > summary *,
+.streamlit-expanderHeader * {
+    color: #140D0B !important;
+    font-family: 'Merriweather', Georgia, serif !important;
+    font-weight: 800 !important;
+    font-size: 1rem !important;
+    opacity: 1 !important;
 }
 
-.streamlit-expanderContent * {
-    color: #1A1A1A;
+/* Expander Chevron Arrow */
+details[data-testid="stExpander"] > summary svg,
+div[data-testid="stExpander"] > summary svg {
+    fill: #140D0B !important;
+    stroke: #140D0B !important;
+    color: #140D0B !important;
+    stroke-width: 2.2 !important;
+}
+
+/* Expander Inner Content Container */
+div[data-testid="stExpanderDetails"],
+.streamlit-expanderContent {
+    background-color: #FFFFFF !important;
+    background: #FFFFFF !important;
+    padding: 18px !important;
+    border-radius: 0 0 5px 5px !important;
+}
+
+div[data-testid="stExpanderDetails"] p,
+div[data-testid="stExpanderDetails"] span {
+    color: #140D0B !important;
+}
+
+/* ========================================================================= */
+/* CODE BLOCKS - HIGH CONTRAST JETBRAINS DARK WALNUT CONSOLE                 */
+/* ========================================================================= */
+div[data-testid="stCodeBlock"],
+div[data-testid="stCode"],
+div.stCodeBlock,
+pre:has(code) {
+    background-color: #181210 !important;
+    background: #181210 !important;
+    border: 2px solid #5C4A3A !important;
+    border-radius: 6px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+    margin: 12px 0 !important;
+}
+
+div[data-testid="stCodeBlock"] pre,
+div[data-testid="stCode"] pre,
+pre code {
+    background-color: #181210 !important;
+    background: #181210 !important;
+    color: #FAF6F0 !important;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace !important;
+    font-size: 0.94rem !important;
+    line-height: 1.65 !important;
+}
+
+/* Code block inner container & text - High Contrast */
+div[data-testid="stCodeBlock"] code,
+div[data-testid="stCode"] code,
+div[data-testid="stCodeBlock"] pre *,
+div[data-testid="stCode"] pre * {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+    color: #FAF6F0 !important;
+}
+
+/* Syntax Highlighting Tokens (Prism / HighlightJS) */
+div[data-testid="stCodeBlock"] .token.comment,
+div[data-testid="stCodeBlock"] span.token.comment {
+    color: #C2B4A6 !important;
+    font-style: italic !important;
+}
+
+div[data-testid="stCodeBlock"] .token.keyword,
+div[data-testid="stCodeBlock"] span.token.keyword {
+    color: #FF7B72 !important;
+    font-weight: 700 !important;
+}
+
+div[data-testid="stCodeBlock"] .token.string,
+div[data-testid="stCodeBlock"] span.token.string {
+    color: #7EE787 !important;
+}
+
+div[data-testid="stCodeBlock"] .token.function,
+div[data-testid="stCodeBlock"] span.token.function {
+    color: #79C0FF !important;
+    font-weight: 600 !important;
+}
+
+div[data-testid="stCodeBlock"] .token.number,
+div[data-testid="stCodeBlock"] .token.boolean,
+div[data-testid="stCodeBlock"] span.token.number,
+div[data-testid="stCodeBlock"] span.token.boolean {
+    color: #FFA657 !important;
+}
+
+div[data-testid="stCodeBlock"] .token.operator,
+div[data-testid="stCodeBlock"] span.token.operator {
+    color: #FAF6F0 !important;
+}
+
+div[data-testid="stCodeBlock"] .token.punctuation,
+div[data-testid="stCodeBlock"] span.token.punctuation {
+    color: #E0D4C5 !important;
+}
+
+/* Copy to Clipboard Button */
+div[data-testid="stCodeBlock"] button,
+div[data-testid="stCode"] button {
+    background-color: rgba(255, 255, 255, 0.15) !important;
+    border: 1px solid rgba(255, 255, 255, 0.35) !important;
+    border-radius: 4px !important;
+    color: #FFFFFF !important;
+}
+
+div[data-testid="stCodeBlock"] button:hover,
+div[data-testid="stCode"] button:hover {
+    background-color: rgba(255, 255, 255, 0.28) !important;
+}
+
+div[data-testid="stCodeBlock"] button svg,
+div[data-testid="stCode"] button svg {
+    fill: #FFFFFF !important;
+}
+
+/* Main Canvas Inline Code `...` */
+section.main code:not(pre code),
+[data-testid="stMain"] code:not(pre code),
+.main code:not(pre code) {
+    background-color: #EFE6D8 !important;
+    color: #140D0B !important;
+    border: 1.5px solid #B8A898 !important;
+    border-radius: 4px !important;
+    padding: 2px 7px !important;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+    font-size: 0.88em !important;
+    font-weight: 600 !important;
 }
 
 /* Metrics and Summary Containers */
@@ -387,6 +618,16 @@ section[data-testid="stFileUploadDropzone"]:hover {
 section[data-testid="stFileUploadDropzone"] * {
     color: #140D0B !important;
     font-weight: 600 !important;
+}
+
+section[data-testid="stFileUploadDropzone"] button {
+    background-color: #271c19 !important;
+    color: #FFFFFF !important;
+    border: 1.5px solid #140D0B !important;
+}
+
+section[data-testid="stFileUploadDropzone"] button * {
+    color: #FFFFFF !important;
 }
 
 /* Legal Citation Card */
@@ -442,9 +683,44 @@ section[data-testid="stFileUploadDropzone"] * {
 
 /* Dataframe clean styling */
 div[data-testid="stDataFrame"] {
-    border: 2px solid #8C7866;
-    border-radius: 6px;
-    background-color: #FFFFFF;
+    border: 2px solid #8C7866 !important;
+    border-radius: 6px !important;
+    background-color: #FFFFFF !important;
+}
+
+div[data-testid="stDataFrame"] * {
+    color: #140D0B !important;
+    font-family: 'Inter', sans-serif !important;
+}
+
+/* JSON Viewer */
+div[data-testid="stJson"] {
+    background-color: #FFFFFF !important;
+    border: 1.5px solid #8C7866 !important;
+    border-radius: 6px !important;
+    padding: 14px !important;
+}
+
+div[data-testid="stJson"] * {
+    color: #140D0B !important;
+    font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Streamlit Alerts / Callouts */
+div[data-testid="stAlert"] {
+    border-radius: 6px !important;
+    border-width: 1.5px !important;
+    padding: 14px 18px !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+}
+
+div[data-testid="stAlert"] p,
+div[data-testid="stAlert"] span,
+div[data-testid="stAlert"] div {
+    color: #140D0B !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.94rem !important;
+    font-weight: 600 !important;
 }
 </style>
 """
